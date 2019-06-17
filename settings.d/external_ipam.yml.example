@@ -6,7 +6,3 @@
     :url: 'http://phpipam.example.com'
     :user: 'phpipam_api_user'
     :password: 'phpipam_password'
-  :netbox: 
-    :url: 'http://netbox.example.com'
-    :user: 'netbox_api_user'
-    :password: 'netbox_api_password'

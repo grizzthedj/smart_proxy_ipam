@@ -13,6 +13,14 @@ class PhpipamApiTest < ::Test::Unit::TestCase
     Proxy::Phpipam::Api.new
   end
 
+  def test_phpipam_is_supported_provider
+    get '/providers'
+    body = JSON.parse(last_response.body)
+    assert last_response.ok?
+    providers = body['ipam_providers']
+    assert_includes(providers, 'phpIPAM')
+  end
+
   def test_next_ip_should_return_error_when_parameter_missing
     get '/next_ip'
     body = JSON.parse(last_response.body)

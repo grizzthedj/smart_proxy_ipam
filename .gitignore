@@ -1,3 +1,4 @@
 
 settings.d/*.yml
 *.gem
+test.rb

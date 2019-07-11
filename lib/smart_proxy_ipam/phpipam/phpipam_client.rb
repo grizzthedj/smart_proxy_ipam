@@ -34,10 +34,10 @@ module Proxy::Phpipam
           # Only return the relevant fields to Foreman
           subnets['data'].each do |subnet|
             response.push({
-              "id": subnet['id'],
-              "subnet": subnet['subnet'],
-              "description": subnet['description'],
-              "mask": subnet['mask']
+              :id => subnet['id'],
+              :subnet => subnet['subnet'],
+              :description => subnet['description'],
+              :mask => subnet['mask']
             })
           end
 
@@ -58,9 +58,9 @@ module Proxy::Phpipam
       if sections
         sections.each do |section|
           response.push({
-            "id": section['id'],
-            "name": section['name'],
-            "description": section['description']
+            :id => section['id'],
+            :name => section['name'],
+            :description => section['description']
           })
         end
       end
@@ -76,11 +76,11 @@ module Proxy::Phpipam
         # Only return the relevant data
         subnets['data'].each do |subnet|
           response.push({
-            "id": subnet['id'],
-            "subnet": subnet['subnet'],
-            "mask": subnet['mask'],
-            "sectionId": subnet['sectionId'],
-            "description": subnet['description']
+            :id => subnet['id'],
+            :subnet => subnet['subnet'],
+            :mask => subnet['mask'],
+            :sectionId => subnet['sectionId'],
+            :description => subnet['description']
           })
         end
       end

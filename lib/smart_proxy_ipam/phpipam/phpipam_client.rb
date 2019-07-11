@@ -47,7 +47,7 @@ module Proxy::Phpipam
     end
 
     def add_ip_to_subnet(ip, subnet_id, desc)
-      data = {'subnetId': subnet_id, 'ip': ip, 'description': desc}
+      data = {:subnetId => subnet_id, :ip => ip, :description => desc}
       post('addresses/', data) 
     end
 

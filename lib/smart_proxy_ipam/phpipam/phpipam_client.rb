@@ -9,7 +9,11 @@ module Proxy::Phpipam
   class PhpipamClient
     def initialize 
       conf = Proxy::Ipam.get_config[:phpipam]
-      @phpipam_config = {url: conf[:url], user: conf[:user], password: conf[:password]}
+      @phpipam_config = {
+        :url => conf[:url], 
+        :user => conf[:user], 
+        :password => conf[:password]
+      }
       @api_base = "#{conf[:url]}/api/#{conf[:user]}/"
       @token = nil
     end
@@ -25,7 +29,7 @@ module Proxy::Phpipam
 
       if subnets
         if subnets['message'] && subnets['message'].downcase == 'no subnets found'
-          return {"message": "no subnets found"}.to_json
+          return {:message => "no subnets found"}.to_json
         else 
           # Only return the relevant fields to Foreman
           subnets['data'].each do |subnet|
@@ -91,14 +95,14 @@ module Proxy::Phpipam
       # the ip existence on an empty subnet returns a malformed response from phpIPAM, containing
       # HTML in the JSON response.
       if usage['data']['used'] == "0"
-        return {ip: ip, exists: false}.to_json
+        return {:ip => ip, :exists => false}.to_json
       else 
         response = get("subnets/#{subnet_id.to_s}/addresses/#{ip}/")
     
         if response && response['message'] && response['message'].downcase == 'no addresses found'
-          return {ip: ip, exists: false}.to_json
+          return {:ip => ip, :exists => false}.to_json
         else 
-          return {ip: ip, exists: true}.to_json
+          return {:ip => ip, :exists => true}.to_json
         end
       end
     end

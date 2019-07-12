@@ -48,7 +48,7 @@ module Proxy::Phpipam
           return {:error => "There are no more free addresses in subnet #{cidr}"}.to_json
         end
 
-        {cidr: cidr, next_ip: response['data']}.to_json
+        {:cidr => cidr, :next_ip => response['data']}.to_json
       rescue Errno::ECONNREFUSED
         return {:error => "Unable to connect to External IPAM server"}.to_json
       end

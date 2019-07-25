@@ -10,11 +10,6 @@ module Proxy::Phpipam
     include ::Proxy::Log
     helpers ::Proxy::Helpers
 
-    get '/providers' do
-      content_type :json
-      {:ipam_providers => ['phpIPAM']}.to_json
-    end
-
     # Gets the next available IP address based on a given subnet
     # 
     # Input:   cidr(string): CIDR address in the format: "100.20.20.0/24"
@@ -35,16 +30,15 @@ module Proxy::Phpipam
         end
 
         phpipam_client = PhpipamClient.new
-        response = phpipam_client.get_subnet(cidr)
+        response = JSON.parse(phpipam_client.get_subnet(cidr))
 
-        if response['message'] && response['message'].downcase == "no subnets found"
+        if !response.kind_of?(Array) && response['message'] && response['message'].downcase == "no subnets found"
           return {:error => "The specified subnet does not exist in External IPAM."}.to_json
         end
   
-        subnet_id = JSON.parse(response)[0]['id']
-        response = phpipam_client.get_next_ip(subnet_id)
+        response = phpipam_client.get_next_ip(response[0]['id'])
 
-        if response['message'] && response['message'].downcase == "no free addresses found"
+        if !response.kind_of?(Array) && response['message'] && response['message'].downcase == "no free addresses found"
           return {:error => "There are no more free addresses in subnet #{cidr}"}.to_json
         end
 

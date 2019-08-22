@@ -24,25 +24,30 @@ module Proxy::Phpipam
 
       begin
         cidr = params[:cidr]
+        mac = params[:mac]
 
         if not cidr
           return {:error => "A 'cidr' parameter for the subnet must be provided(e.g. 100.10.10.0/24)"}.to_json
         end
+        if not mac
+          return {:error => "A 'mac' address must be provided(e.g. 00:0a:95:9d:68:10)"}.to_json
+        end
 
         phpipam_client = PhpipamClient.new
-        response = JSON.parse(phpipam_client.get_subnet(cidr))
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr))
 
-        if !response.kind_of?(Array) && response['message'] && response['message'].downcase == "no subnets found"
+        if !subnet.kind_of?(Array) && subnet['message'] && subnet['message'].downcase == "no subnets found"
           return {:error => "The specified subnet does not exist in External IPAM."}.to_json
         end
-  
-        response = phpipam_client.get_next_ip(response[0]['id'])
+        
+        subnet_id = subnet[0]['id']
+        ip = phpipam_client.get_next_ip(subnet_id, mac, cidr)
 
-        if !response.kind_of?(Array) && response['message'] && response['message'].downcase == "no free addresses found"
+        if !ip.kind_of?(Array) && ip['message'] && ip['message'].downcase == "no free addresses found"
           return {:error => "There are no more free addresses in subnet #{cidr}"}.to_json
         end
 
-        {:cidr => cidr, :next_ip => response['data']}.to_json
+        {:cidr => cidr, :next_ip => ip['next_ip']}.to_json
       rescue Errno::ECONNREFUSED
         return {:error => "Unable to connect to External IPAM server"}.to_json
       end
@@ -109,9 +114,9 @@ module Proxy::Phpipam
       end
     end
 
-    # Get a list of subnets for given external ipam section
+    # Get a list of subnets for given external ipam section/group
     #
-    # Input: section_id(integer). The id of the external ipam section
+    # Input: section_name(string). The name of the external ipam section/group
     # Returns: Array of subnets(as json) in "data" key on success, hash with error otherwise
     # Examples:
     #   Response if success: 
@@ -163,19 +168,19 @@ module Proxy::Phpipam
     #       "time":0.012
     #     }
     #   Response if :error =>   
-    #     {"error":"Unable to connect to phpIPAM server"}
-    get '/sections/:section_id/subnets' do
+    #     {"error":"Unable to connect to External IPAM server"}
+    get '/sections/:section_name/subnets' do
       content_type :json 
 
       begin
-        section_id = params[:section_id]
+        section_name = URI.decode(params[:section_name])
         
-        if not section_id
-          return {:error => "A 'section_id' must be provided"}.to_json
+        if not section_name
+          return {:error => "A 'section_name' must be provided"}.to_json
         end
 
         phpipam_client = PhpipamClient.new
-        subnets = phpipam_client.get_subnets(section_id)
+        subnets = phpipam_client.get_subnets(section_name)
         subnets.to_json
       rescue Errno::ECONNREFUSED
         return {:error => "Unable to connect to External IPAM server"}.to_json

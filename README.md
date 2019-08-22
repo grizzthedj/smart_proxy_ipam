@@ -15,10 +15,10 @@ for how to install Foreman plugins
 
 ## Usage
 
-Once plugin is installed, you can look at the phpIPAM Dashboard(at Infrastructure --> phpIPAM Dashboard), for a simple view of sections, subnets etc. and/or use phpIPAM to get the next available IP address for a subnet:
+Once plugin is installed, you can look at the phpIPAM Dashboard(at Infrastructure --> IPAM Dashboard), for a simple view of sections, subnets etc. and/or use phpIPAM to get the next available IP address for a subnet:
 
-1. Create a subnet in Foreman of IPAM type "phpIPAM". Click on the `Proxy` tab and associate the subnet with the phpIPAM proxy. _NOTE: This subnet must actually exist in phpIPAM. There is no phpIPAM integration on the subnet creation at this time._
-2. Create a host in Foreman. When adding/editing interfaces, select the above subnet, and the next available IP(pulled from phpIPAM) for the selected subnet will be displayed in the IPv4 address field. _NOTE: This is not supported for IPv6._
+1. Create a subnet in Foreman of IPAM type "External IPAM". Click on the `Proxy` tab and associate the subnet with the External IPAM proxy. _NOTE: This subnet must actually exist in phpIPAM. There is no phpIPAM integration on the subnet creation at this time._
+2. Create a host in Foreman. When adding/editing interfaces, select the above created subnet, and the next available IP(pulled from phpIPAM) for the selected subnet will be displayed in the IPv4 address field. _NOTE: This is not supported for IPv6._
 
 ## Local development
 
@@ -62,8 +62,8 @@ bundle exec smart-proxy start
 ```
 9. Navigate to Foreman UI at http://localhost:5000
 10. Add a Local Smart Proxy in the Foreman UI(Infrastructure => Smart Proxies)
-11. Ensure that the `phpipam` feature is present on the proxy(http://proxy_url/features)
-12. Create a Subnet, and associate the subnet to the `phpipam` proxy
+11. Ensure that the `external_ipam` feature is present on the proxy(http://proxy_url/features)
+12. Create a Subnet, and associate the subnet to the `external_ipam` proxy
  
 ## Contributing
 

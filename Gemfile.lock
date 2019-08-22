@@ -12,11 +12,12 @@ GIT
 PATH
   remote: .
   specs:
-    smart_proxy_ipam (0.0.6)
+    smart_proxy_ipam (0.0.10)
 
 GEM
   remote: https://rubygems.org/
   specs:
+    concurrent-ruby (1.1.5)
     json (2.2.0)
     little-plugger (1.1.4)
     logging (2.2.2)
@@ -47,6 +48,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  concurrent-ruby (~> 1.0)
   json
   mocha
   rack-test
@@ -56,4 +58,4 @@ DEPENDENCIES
   test-unit
 
 BUNDLED WITH
-   2.0.1
+   2.0.2

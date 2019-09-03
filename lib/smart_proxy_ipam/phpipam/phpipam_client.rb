@@ -13,14 +13,15 @@ module Proxy::Phpipam
     MAX_RETRIES = 5
     DEFAULT_CLEANUP_INTERVAL = 120  # 2 mins
     @@ip_cache = nil
+    @@timer_task = nil
 
     def initialize 
       @conf = Proxy::Ipam.get_config[:phpipam]
       @api_base = "#{@conf[:url]}/api/#{@conf[:user]}/"
       @token = nil
-      @m = Monitor.new
+      @@m = Monitor.new
       init_cache if @@ip_cache.nil?
-      start_cleanup_task
+      start_cleanup_task if @@timer_task.nil?
     end
 
     def get_subnet(cidr)
@@ -157,8 +158,8 @@ module Proxy::Phpipam
 
     def start_cleanup_task
       logger.info("Starting allocated ip address maintenance (used by get_next_ip call).")
-      @timer_task = Concurrent::TimerTask.new(:execution_interval => DEFAULT_CLEANUP_INTERVAL) { init_cache }
-      @timer_task.execute
+      @@timer_task = Concurrent::TimerTask.new(:execution_interval => DEFAULT_CLEANUP_INTERVAL) { init_cache }
+      @@timer_task.execute
     end
 
     private
@@ -176,14 +177,14 @@ module Proxy::Phpipam
     # }
     def init_cache
       logger.debug("Clearing ip cache.")
-      @m.synchronize do
+      @@m.synchronize do
         @@ip_cache = {}
       end
     end
 
     def add_ip_to_cache(ip, mac, cidr)
       logger.debug("Adding IP #{ip} to cache for subnet #{cidr}")
-      @m.synchronize do
+      @@m.synchronize do
         if @@ip_cache.key?(cidr.to_sym)
           @@ip_cache[cidr.to_sym][mac.to_sym] = ip.to_s
         else
@@ -193,7 +194,7 @@ module Proxy::Phpipam
     end
 
     # Called when next available IP from external IPAM has been cached by another user/host, but 
-    # not actually persisted in external IPAM. Try to increment the IP(MAX_RETRIES times), and 
+    # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and 
     # see if it is available in external IPAM.
     def find_new_ip(subnet_id, ip, mac, cidr)
       found_ip = nil

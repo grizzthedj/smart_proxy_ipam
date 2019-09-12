@@ -2,6 +2,7 @@ require 'sinatra'
 require 'smart_proxy_ipam/ipam'
 require 'smart_proxy_ipam/ipam_main'
 require 'smart_proxy_ipam/phpipam/phpipam_client'
+require 'smart_proxy_ipam/phpipam/phpipam_helper'
 
 # TODO: Refactor later to handle multiple IPAM providers. For now, it is 
 # just phpIPAM that is supported
@@ -9,6 +10,7 @@ module Proxy::Phpipam
   class Api < ::Sinatra::Base
     include ::Proxy::Log
     helpers ::Proxy::Helpers
+    helpers PhpipamHelper
 
     # Gets the next available IP address based on a given subnet
     # 
@@ -23,33 +25,23 @@ module Proxy::Phpipam
       content_type :json
 
       begin
+        err = validate_required_params(["cidr", "mac"], params)
+        return err if err.length > 0
+
         cidr = params[:cidr]
         mac = params[:mac]
-
-        if not cidr
-          return {:error => "A 'cidr' parameter for the subnet must be provided(e.g. 100.10.10.0/24)"}.to_json
-        end
-        if not mac
-          return {:error => "A 'mac' address must be provided(e.g. 00:0a:95:9d:68:10)"}.to_json
-        end
-
         phpipam_client = PhpipamClient.new
         subnet = JSON.parse(phpipam_client.get_subnet(cidr))
 
-        if !subnet.kind_of?(Array) && subnet['message'] && subnet['message'].downcase == "no subnets found"
-          return {:error => "The specified subnet does not exist in External IPAM."}.to_json
-        end
-        
-        subnet_id = subnet[0]['id']
-        ip = phpipam_client.get_next_ip(subnet_id, mac, cidr)
+        return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnet)
 
-        if !ip.kind_of?(Array) && ip['message'] && ip['message'].downcase == "no free addresses found"
-          return {:error => "There are no more free addresses in subnet #{cidr}"}.to_json
-        end
+        ip = phpipam_client.get_next_ip(subnet[0]['id'], mac, cidr)
+
+        return {:error => errors[:no_free_ip]}.to_json if no_free_ip_found(ip)
 
         {:cidr => cidr, :next_ip => ip['next_ip']}.to_json
-      rescue Errno::ECONNREFUSED
-        return {:error => "Unable to connect to External IPAM server"}.to_json
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+        return {:error => errors[:no_connection]}.to_json
       end
     end
 
@@ -76,17 +68,15 @@ module Proxy::Phpipam
       content_type :json
 
       begin
-        cidr = params[:cidr]
-
-        if not cidr
-          return {:error => "A 'cidr' parameter for the subnet must be provided(e.g. 100.10.10.0/24)"}.to_json
-        end
+        err = validate_required_params(["cidr"], params)
+        return err if err.length > 0
 
         phpipam_client = PhpipamClient.new
-        subnet = phpipam_client.get_subnet(cidr)
+        subnet = JSON.parse(phpipam_client.get_subnet(params[:cidr]))
+        return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnet)
         subnet.to_json
-      rescue Errno::ECONNREFUSED
-        return {:error => "Unable to connect to External IPAM server"}.to_json
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+        return {:error => errors[:no_connection]}.to_json
       end
     end
 
@@ -107,10 +97,9 @@ module Proxy::Phpipam
 
       begin
         phpipam_client = PhpipamClient.new
-        sections = phpipam_client.get_sections
-        sections.to_json
-      rescue Errno::ECONNREFUSED
-        return {:error => "Unable to connect to External IPAM server"}.to_json
+        phpipam_client.get_sections.to_json
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+        return {:error => errors[:no_connection]}.to_json
       end
     end
 
@@ -173,17 +162,19 @@ module Proxy::Phpipam
       content_type :json 
 
       begin
+        err = validate_required_params(["section_name"], params)
+        return err if err.length > 0
+ 
         section_name = URI.decode(params[:section_name])
-        
-        if not section_name
-          return {:error => "A 'section_name' must be provided"}.to_json
-        end
-
         phpipam_client = PhpipamClient.new
-        subnets = phpipam_client.get_subnets(section_name)
+        section = phpipam_client.get_section(section_name)
+
+        return {:error => errors[:no_section]}.to_json if section.nil?
+
+        subnets = phpipam_client.get_subnets(section['id'].to_s)
         subnets.to_json
-      rescue Errno::ECONNREFUSED
-        return {:error => "Unable to connect to External IPAM server"}.to_json
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+        return {:error => errors[:no_connection]}.to_json
       end
     end
 
@@ -201,23 +192,17 @@ module Proxy::Phpipam
       content_type :json 
 
       begin
-        cidr = params[:cidr]
-        ip = params[:ip]
-
-        return {:error => "Missing 'cidr' parameter. A CIDR IPv4 address must be provided(e.g. 100.10.10.0/24)"}.to_json if not cidr
-        return {:error => "Missing 'ip' parameter. An IPv4 address must be provided(e.g. 100.10.10.22)"}.to_json if not ip
+        err = validate_required_params(["cidr", "ip"], params)
+        return err if err.length > 0
 
         phpipam_client = PhpipamClient.new
-        subnet = phpipam_client.get_subnet(cidr)
+        subnet = JSON.parse(phpipam_client.get_subnet(params[:cidr]))
 
-        if subnet['message'] && subnet['message'].downcase == "no subnets found"
-          return {:error => "The specified subnet does not exist in External IPAM."}.to_json
-        end
+        return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnet)
 
-        subnet_id = JSON.parse(subnet)[0]['id']
-        phpipam_client.ip_exists(ip, subnet_id)
-      rescue Errno::ECONNREFUSED
-        return {:error => "Unable to connect to External IPAM server"}.to_json
+        phpipam_client.ip_exists(params[:ip], subnet[0]['id'])
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+        return {:error => errors[:no_connection]}.to_json
       end
     end
 
@@ -236,26 +221,21 @@ module Proxy::Phpipam
       content_type :json
 
       begin
-        cidr = params[:cidr]
+        err = validate_required_params(["cidr", "ip"], params)
+        return err if err.length > 0
+
         ip = params[:ip]
-
-        return {:error => "Missing 'cidr' parameter. A CIDR IPv4 address must be provided(e.g. 100.10.10.0/24)"}.to_json if not cidr
-        return {:error => "Missing 'ip' parameter. An IPv4 address must be provided(e.g. 100.10.10.22)"}.to_json if not ip
-
+        cidr = params[:cidr]
         phpipam_client = PhpipamClient.new
-        response = phpipam_client.get_subnet(cidr)
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr))
 
-        if response['message'] && response['message'].downcase == "no subnets found"
-          return {:error => "The specified subnet does not exist in External IPAM."}.to_json
-        end
+        return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnet)
 
-        subnet_id = JSON.parse(response)[0]['id']
-
-        phpipam_client.add_ip_to_subnet(ip, subnet_id, 'Address auto added by Foreman')
+        phpipam_client.add_ip_to_subnet(ip, subnet[0]['id'], 'Address auto added by Foreman')
 
         {:message => "IP #{ip} added to subnet #{cidr} successfully."}.to_json
-      rescue Errno::ECONNREFUSED
-        return {:error => "Unable to connect to External IPAM server"}.to_json
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+        return {:error => errors[:no_connection]}.to_json
       end
     end
 
@@ -273,28 +253,22 @@ module Proxy::Phpipam
       content_type :json
 
       begin
-        cidr = params[:cidr]
+        err = validate_required_params(["cidr", "ip"], params)
+        return err if err.length > 0
+
         ip = params[:ip]
-
-        return {:error => "Missing 'cidr' parameter. A CIDR IPv4 address must be provided(e.g. 100.10.10.0/24)"}.to_json if not cidr
-        return {:error => "Missing 'ip' parameter. An IPv4 address must be provided(e.g. 100.10.10.22)"}.to_json if not ip
-
+        cidr = params[:cidr]
         phpipam_client = PhpipamClient.new
-        response = phpipam_client.get_subnet(cidr)
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr))
 
-        if response['message'] && response['message'].downcase == "no subnets found"
-          return {:error => "The specified subnet does not exist in External IPAM."}.to_json
-        end
+        return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnet)
 
-        subnet_id = JSON.parse(response)[0]['id']
-
-        phpipam_client.delete_ip_from_subnet(ip, subnet_id)
+        phpipam_client.delete_ip_from_subnet(ip, subnet[0]['id'])
 
         {:message => "IP #{ip} deleted from subnet #{cidr} successfully."}.to_json
-      rescue Errno::ECONNREFUSED
-        return {:error => "Unable to connect to External IPAM server"}.to_json
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+        return {:error => errors[:no_connection]}.to_json
       end
     end
-
   end
 end

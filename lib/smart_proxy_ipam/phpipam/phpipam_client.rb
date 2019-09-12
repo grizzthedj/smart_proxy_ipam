@@ -5,10 +5,12 @@ require 'monitor'
 require 'concurrent'
 require 'smart_proxy_ipam/ipam'
 require 'smart_proxy_ipam/ipam_main'
+require 'smart_proxy_ipam/phpipam/phpipam_helper'
 
 module Proxy::Phpipam
   class PhpipamClient
     include Proxy::Log
+    include PhpipamHelper
 
     MAX_RETRIES = 5
     DEFAULT_CLEANUP_INTERVAL = 120  # 2 mins
@@ -26,30 +28,29 @@ module Proxy::Phpipam
 
     def get_subnet(cidr)
       subnets = get("subnets/cidr/#{cidr.to_s}")
+      return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnets)
       response = []
 
-      if subnets
-        if subnets['message'] && subnets['message'].downcase == 'no subnets found'
-          return {:message => "no subnets found"}.to_json
-        else 
-          # Only return the relevant fields
-          subnets['data'].each do |subnet|
-            response.push({
-              :id => subnet['id'],
-              :subnet => subnet['subnet'],
-              :description => subnet['description'],
-              :mask => subnet['mask']
-            })
-          end
-
-          return response.to_json
-        end
+      # Only return the relevant fields
+      subnets['data'].each do |subnet|
+        response.push({
+          :id => subnet['id'],
+          :subnet => subnet['subnet'],
+          :description => subnet['description'],
+          :mask => subnet['mask']
+        })
       end
+
+      response.to_json
     end
 
     def add_ip_to_subnet(ip, subnet_id, desc)
       data = {:subnetId => subnet_id, :ip => ip, :description => desc}
       post('addresses/', data) 
+    end
+
+    def get_section(section_name)
+      get("sections/#{section_name}/")["data"]
     end
 
     def get_sections
@@ -69,11 +70,7 @@ module Proxy::Phpipam
       response
     end
 
-    def get_subnets(section_name)
-      sections = get_sections
-      section = sections.select {|section| section[:name] == section_name}
-      return {:error => "Section '#{section_name}' not found"}.to_json if section.size == 0
-      section_id = section[0][:id].to_s 
+    def get_subnets(section_id)
       subnets = get("sections/#{section_id}/subnets/")
       response = [] 
 
@@ -103,8 +100,8 @@ module Proxy::Phpipam
         return {:ip => ip, :exists => false}.to_json
       else 
         response = get("subnets/#{subnet_id.to_s}/addresses/#{ip}/")
-    
-        if response && response['message'] && response['message'].downcase == 'no addresses found'
+
+        if ip_not_found(response)
           return {:ip => ip, :exists => false}.to_json
         else 
           return {:ip => ip, :exists => true}.to_json
@@ -127,11 +124,11 @@ module Proxy::Phpipam
 
       return response if response['message']
 
-      if subnet_hash&.key?(mac.to_sym)
+      if subnet_hash && subnet_hash.key?(mac.to_sym)
         response['next_ip'] = @@ip_cache[cidr.to_sym][mac.to_sym]
       else
         new_ip = response['data']
-        ip_not_in_cache = subnet_hash&.key(new_ip).nil?
+        ip_not_in_cache = subnet_hash && subnet_hash.key(new_ip).nil?
 
         if ip_not_in_cache
           next_ip = new_ip.to_s

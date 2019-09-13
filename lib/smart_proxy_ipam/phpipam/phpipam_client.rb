@@ -101,7 +101,7 @@ module Proxy::Phpipam
       else 
         response = get("subnets/#{subnet_id.to_s}/addresses/#{ip}/")
 
-        if ip_not_found(response)
+        if ip_not_found_in_ipam(response)
           return {:ip => ip, :exists => false}.to_json
         else 
           return {:ip => ip, :exists => true}.to_json

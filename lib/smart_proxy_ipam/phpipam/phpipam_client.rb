@@ -3,6 +3,7 @@ require 'json'
 require 'net/http'
 require 'monitor'
 require 'concurrent'
+require 'time'
 require 'smart_proxy_ipam/ipam'
 require 'smart_proxy_ipam/ipam_main'
 require 'smart_proxy_ipam/phpipam/phpipam_helper'
@@ -125,7 +126,7 @@ module Proxy::Phpipam
       return response if response['message']
 
       if subnet_hash && subnet_hash.key?(mac.to_sym)
-        response['next_ip'] = @@ip_cache[cidr.to_sym][mac.to_sym]
+        response['next_ip'] = @@ip_cache[cidr.to_sym][mac.to_sym]["ip".to_sym]
       else
         new_ip = response['data']
         ip_not_in_cache = subnet_hash && subnet_hash.key(new_ip).nil?
@@ -164,18 +165,31 @@ module Proxy::Phpipam
     # @@ip_cache structure
     # {  
     #   "100.55.55.0/24":{  
-    #      "00:0a:95:9d:68:10": "100.55.55.1"
+    #      "00:0a:95:9d:68:10": {"ip": "100.55.55.1", "timestamp": "2019-09-17 12:03:43 -D400"}
     #   },
     #   "123.11.33.0/24":{  
-    #     "00:0a:95:9d:68:33": "123.11.33.1",
-    #     "00:0a:95:9d:68:34": "123.11.33.2",
-    #     "00:0a:95:9d:68:35": "123.11.33.3"
+    #      "00:0a:95:9d:68:33": {"ip": "123.11.33.1", "timestamp": "2019-09-17 12:04:43 -0400"}
+    #      "00:0a:95:9d:68:34": {"ip": "123.11.33.2", "timestamp": "2019-09-17 12:05:48 -0400"}
+    #      "00:0a:95:9d:68:35": {"ip": "123.11.33.3", "timestamp:: "2019-09-17 12:06:50 -0400"}
     #   }
     # }
     def init_cache
       logger.debug("Clearing ip cache.")
       @@m.synchronize do
-        @@ip_cache = {}
+        if @@ip_cache and not @@ip_cache.empty?
+          @@ip_cache.each do |key, values|
+            values.each do |mac, value|
+              if Time.now - Time.parse(value["timestamp".to_sym]) > DEFAULT_CLEANUP_INTERVAL
+                @@ip_cache[key].delete(mac)
+              end
+            end
+            if @@ip_cache[key].nil? or @@ip_cache[key].empty?
+              @@ip_cache.delete(key)
+            end
+          end
+        else
+          @@ip_cache = {}
+        end
       end
     end
 
@@ -183,9 +197,10 @@ module Proxy::Phpipam
       logger.debug("Adding IP #{ip} to cache for subnet #{cidr}")
       @@m.synchronize do
         if @@ip_cache.key?(cidr.to_sym)
-          @@ip_cache[cidr.to_sym][mac.to_sym] = ip.to_s
+          @@ip_cache[cidr.to_sym][mac.to_sym]["ip".to_sym] = ip.to_s
+          @@ip_cache[cidr.to_sym][mac,ti_sym]["timestamp".to_sym]=Time.now.to_s
         else
-          @@ip_cache = @@ip_cache.merge({cidr.to_sym => {mac.to_sym => ip.to_s}})
+          @@ip_cache = @@ip_cache.merge({cidr.to_sym => {mac.to_sym => {"ip" => ip.to_s, "timestamp" => Time.now.to_s}}})
         end
       end
     end

@@ -126,7 +126,7 @@ module Proxy::Phpipam
       return response if response['message']
 
       if subnet_hash && subnet_hash.key?(mac.to_sym)
-        response['next_ip'] = @@ip_cache[cidr.to_sym][mac.to_sym]["ip".to_sym]
+        response['next_ip'] = @@ip_cache[cidr.to_sym][mac.to_sym][:ip]
       else
         new_ip = response['data']
         ip_not_in_cache = subnet_hash && subnet_hash.key(new_ip).nil?
@@ -179,7 +179,7 @@ module Proxy::Phpipam
         if @@ip_cache and not @@ip_cache.empty?
           @@ip_cache.each do |key, values|
             values.each do |mac, value|
-              if Time.now - Time.parse(value["timestamp".to_sym]) > DEFAULT_CLEANUP_INTERVAL
+              if Time.now - Time.parse(value[:timestamp]) > DEFAULT_CLEANUP_INTERVAL
                 @@ip_cache[key].delete(mac)
               end
             end
@@ -197,10 +197,9 @@ module Proxy::Phpipam
       logger.debug("Adding IP #{ip} to cache for subnet #{cidr}")
       @@m.synchronize do
         if @@ip_cache.key?(cidr.to_sym)
-          @@ip_cache[cidr.to_sym][mac.to_sym]["ip".to_sym] = ip.to_s
-          @@ip_cache[cidr.to_sym][mac,ti_sym]["timestamp".to_sym]=Time.now.to_s
+          @@ip_cache[cidr.to_sym][mac.to_sym] = {:ip => ip.to_s, :timestamp => Time.now.to_s}
         else
-          @@ip_cache = @@ip_cache.merge({cidr.to_sym => {mac.to_sym => {"ip" => ip.to_s, "timestamp" => Time.now.to_s}}})
+          @@ip_cache = @@ip_cache.merge({cidr.to_sym => {mac.to_sym => {:ip => ip.to_s, :timestamp => Time.now.to_s}}})
         end
       end
     end

@@ -128,8 +128,9 @@ module Proxy::Phpipam
       if subnet_hash && subnet_hash.key?(mac.to_sym)
         response['next_ip'] = @@ip_cache[cidr.to_sym][mac.to_sym][:ip]
       else
+        next_ip = nil
         new_ip = response['data']
-        ip_not_in_cache = subnet_hash && subnet_hash.key(new_ip).nil?
+        ip_not_in_cache = subnet_hash && !subnet_hash.to_s.include?(new_ip.to_s)  
 
         if ip_not_in_cache
           next_ip = new_ip.to_s
@@ -183,9 +184,7 @@ module Proxy::Phpipam
                 @@ip_cache[key].delete(mac)
               end
             end
-            if @@ip_cache[key].nil? or @@ip_cache[key].empty?
-              @@ip_cache.delete(key)
-            end
+            @@ip_cache.delete(key) if @@ip_cache[key].nil? or @@ip_cache[key].empty?
           end
         else
           @@ip_cache = {}
@@ -196,6 +195,14 @@ module Proxy::Phpipam
     def add_ip_to_cache(ip, mac, cidr)
       logger.debug("Adding IP #{ip} to cache for subnet #{cidr}")
       @@m.synchronize do
+        #clear cache data which has the same mac and ip with the new one 
+        @@ip_cache.each do |key, values|
+          if values.keys.include? mac.to_sym
+            @@ip_cache[key].delete(mac.to_sym)
+          end
+          @@ip_cache.delete(key) if @@ip_cache[key].nil? or @@ip_cache[key].empty?
+        end   
+        
         if @@ip_cache.key?(cidr.to_sym)
           @@ip_cache[cidr.to_sym][mac.to_sym] = {:ip => ip.to_s, :timestamp => Time.now.to_s}
         else
@@ -217,7 +224,7 @@ module Proxy::Phpipam
         verify_ip = JSON.parse(ip_exists(new_ip, subnet_id))
 
         # If new IP doesn't exist in IPAM and not in the cache
-        if verify_ip['exists'] == false && !ip_exists_in_cache(new_ip, cidr)
+        if verify_ip['exists'] == false && !ip_exists_in_cache(new_ip, cidr, mac)
           found_ip = new_ip.to_s
           add_ip_to_cache(found_ip, mac, cidr)
           break
@@ -238,8 +245,8 @@ module Proxy::Phpipam
       IPAddr.new(ip.to_s).succ.to_s
     end
 
-    def ip_exists_in_cache(ip, cidr)
-      @@ip_cache[cidr.to_sym] && !@@ip_cache[cidr.to_sym].key(ip).nil?
+    def ip_exists_in_cache(ip, cidr, mac)
+      @@ip_cache[cidr.to_sym] && @@ip_cache[cidr.to_sym].to_s.include?(ip.to_s)      
     end
 
     # Checks if given IP is within a subnet. Broadcast address is considered unusable

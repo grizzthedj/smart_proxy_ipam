@@ -28,109 +28,69 @@ module Proxy::Phpipam
     end
 
     def get_subnet(cidr)
-      subnets = get("subnets/cidr/#{cidr.to_s}")
-      return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnets)
-      response = []
+      response = get("subnets/cidr/#{cidr.to_s}")
+      json_body = JSON.parse(response.body)
 
-      # Only return the relevant fields
-      subnets['data'].each do |subnet|
-        response.push({
-          :id => subnet['id'],
-          :subnet => subnet['subnet'],
-          :description => subnet['description'],
-          :mask => subnet['mask']
-        })
-      end
+      return response.body if no_subnets_found(json_body)
 
-      response.to_json
+      json_body['data'] = filter_fields(json_body, [:id, :subnet, :description, :mask])
+      response.body = json_body.to_json
+      response.header['Content-Length'] = json_body.to_s.length
+      response.body
+    end
+
+    def get_section(section_name)
+      response = get("sections/#{section_name}/")
+      response.body
+    end
+
+    def get_sections
+      response = get('sections/')
+      json_body = JSON.parse(response.body)
+      json_body['data'] = filter_fields(json_body, [:id, :name, :description])
+      response.body = json_body.to_json
+      response.header['Content-Length'] = json_body.to_s.length
+      response.body
+    end
+
+    def get_subnets(section_id)
+      response = get("sections/#{section_id}/subnets/")
+      json_body = JSON.parse(response.body)
+      json_body['data'] = filter_fields(json_body, [:id, :subnet, :mask, :sectionId, :description])
+      response.body = json_body.to_json
+      response.header['Content-Length'] = json_body.to_s.length
+      response.body
+    end
+
+    def ip_exists(ip, subnet_id)
+      response = get("subnets/#{subnet_id.to_s}/addresses/#{ip}/")
+      response.body
     end
 
     def add_ip_to_subnet(ip, subnet_id, desc)
       data = {:subnetId => subnet_id, :ip => ip, :description => desc}
-      post('addresses/', data) 
-    end
-
-    def get_section(section_name)
-      get("sections/#{section_name}/")["data"]
-    end
-
-    def get_sections
-      sections = get('sections/')['data']
-      response = []
-
-      if sections
-        sections.each do |section|
-          response.push({
-            :id => section['id'],
-            :name => section['name'],
-            :description => section['description']
-          })
-        end
-      end
-
-      response
-    end
-
-    def get_subnets(section_id)
-      subnets = get("sections/#{section_id}/subnets/")
-      response = [] 
-
-      if subnets && subnets['data']
-        # Only return the relevant fields
-        subnets['data'].each do |subnet|
-          response.push({
-            :id => subnet['id'],
-            :subnet => subnet['subnet'],
-            :mask => subnet['mask'],
-            :sectionId => subnet['sectionId'],
-            :description => subnet['description']
-          })
-        end
-      end
-
-      response
-    end
-
-    def ip_exists(ip, subnet_id)
-      usage = get_subnet_usage(subnet_id)
-
-      # We need to check subnet usage first in the case there are zero ips in the subnet. Checking
-      # the ip existence on an empty subnet returns a malformed response from phpIPAM(v1.3), containing
-      # HTML in the JSON response.
-      if usage['data']['used'] == "0"
-        return {:ip => ip, :exists => false}.to_json
-      else 
-        response = get("subnets/#{subnet_id.to_s}/addresses/#{ip}/")
-
-        if ip_not_found_in_ipam(response)
-          return {:ip => ip, :exists => false}.to_json
-        else 
-          return {:ip => ip, :exists => true}.to_json
-        end
-      end
-    end
-
-    
-    def get_subnet_usage(subnet_id)
-      get("subnets/#{subnet_id.to_s}/usage/")
+      response = post('addresses/', data)
+      response.body
     end
 
     def delete_ip_from_subnet(ip, subnet_id)
-      delete("addresses/#{ip}/#{subnet_id.to_s}/") 
+      response = delete("addresses/#{ip}/#{subnet_id.to_s}/") 
+      response.body
     end
 
     def get_next_ip(subnet_id, mac, cidr)
       response = get("subnets/#{subnet_id.to_s}/first_free/")
+      json_body = JSON.parse(response.body)
       subnet_hash = @@ip_cache[cidr.to_sym]
 
-      return response if response['message']
+      return {:error => json_body['message']}.to_json if json_body['message']
 
       if subnet_hash && subnet_hash.key?(mac.to_sym)
-        response['next_ip'] = @@ip_cache[cidr.to_sym][mac.to_sym][:ip]
+        json_body['data'] = @@ip_cache[cidr.to_sym][mac.to_sym][:ip]
       else
         next_ip = nil
-        new_ip = response['data']
-        ip_not_in_cache = subnet_hash && !subnet_hash.to_s.include?(new_ip.to_s)  
+        new_ip = json_body['data']
+        ip_not_in_cache = subnet_hash.nil? ? true : !subnet_hash.to_s.include?(new_ip.to_s)
 
         if ip_not_in_cache
           next_ip = new_ip.to_s
@@ -139,20 +99,15 @@ module Proxy::Phpipam
           next_ip = find_new_ip(subnet_id, new_ip, mac, cidr)
         end
 
-        if next_ip.nil?
-          response['error'] = "Unable to find another available IP address in subnet #{cidr}"
-          return response
-        end
+        return {:error => "Unable to find another available IP address in subnet #{cidr}"}.to_json if next_ip.nil?
+        return {:error => "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{DEFAULT_CLEANUP_INTERVAL} seconds)."}.to_json unless usable_ip(next_ip, cidr)
 
-        unless usable_ip(next_ip, cidr)
-          response['error'] = "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{CLEAR_CACHE_DELAY} seconds)."
-          return response
-        end
-
-        response['next_ip'] = next_ip
+        json_body['data'] = next_ip
       end
 
-      response
+      response.body = json_body.to_json
+      response.header['Content-Length'] = json_body.to_s.length
+      response.body
     end
 
     def start_cleanup_task
@@ -195,7 +150,7 @@ module Proxy::Phpipam
     def add_ip_to_cache(ip, mac, cidr)
       logger.debug("Adding IP #{ip} to cache for subnet #{cidr}")
       @@m.synchronize do
-        #clear cache data which has the same mac and ip with the new one 
+        # Clear cache data which has the same mac and ip with the new one 
         @@ip_cache.each do |key, values|
           if values.keys.include? mac.to_sym
             @@ip_cache[key].delete(mac.to_sym)
@@ -224,7 +179,7 @@ module Proxy::Phpipam
         verify_ip = JSON.parse(ip_exists(new_ip, subnet_id))
 
         # If new IP doesn't exist in IPAM and not in the cache
-        if verify_ip['exists'] == false && !ip_exists_in_cache(new_ip, cidr, mac)
+        if ip_not_found_in_ipam(verify_ip) && !ip_exists_in_cache(new_ip, cidr, mac)
           found_ip = new_ip.to_s
           add_ip_to_cache(found_ip, mac, cidr)
           break
@@ -255,18 +210,15 @@ module Proxy::Phpipam
       network.include?(IPAddr.new(ip)) && network.to_range.last != ip
     end
 
-    def get(path, body=nil)
+    def get(path)
       authenticate
       uri = URI(@api_base + path)
-      uri.query = URI.encode_www_form(body) if body
       request = Net::HTTP::Get.new(uri)
       request['token'] = @token
 
-      response = Net::HTTP.start(uri.hostname, uri.port) {|http|
+      Net::HTTP.start(uri.hostname, uri.port) {|http|
         http.request(request)
       }
-
-      JSON.parse(response.body)
     end
 
     def delete(path, body=nil)
@@ -276,11 +228,9 @@ module Proxy::Phpipam
       request = Net::HTTP::Delete.new(uri)
       request['token'] = @token
 
-      response = Net::HTTP.start(uri.hostname, uri.port) {|http|
+      Net::HTTP.start(uri.hostname, uri.port) {|http|
         http.request(request)
       }
-
-      JSON.parse(response.body)
     end
 
     def post(path, body=nil)
@@ -290,11 +240,9 @@ module Proxy::Phpipam
       request = Net::HTTP::Post.new(uri)
       request['token'] = @token
 
-      response = Net::HTTP.start(uri.hostname, uri.port) {|http|
+      Net::HTTP.start(uri.hostname, uri.port) {|http|
         http.request(request)
       }
-
-      JSON.parse(response.body)
     end
 
     def authenticate

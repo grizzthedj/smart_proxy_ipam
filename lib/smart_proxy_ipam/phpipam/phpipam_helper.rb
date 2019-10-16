@@ -13,6 +13,10 @@ module PhpipamHelper
     !subnet.kind_of?(Array) && subnet['message'] && subnet['message'].downcase == "no subnets found"
   end
 
+  def no_section_found(section)
+    section['message'] && section['message'].downcase == "not found"
+  end
+
   def no_free_ip_found(ip)
     !ip.kind_of?(Array) && ip['message'] && ip['message'].downcase == "no free addresses found"
   end
@@ -21,6 +25,17 @@ module PhpipamHelper
     ip && ip['message'] && ip['message'].downcase == 'no addresses found'
   end
   
+  # Returns an array of hashes with only the fields given in the fields param
+  def filter_fields(json_body, fields)
+    data = []
+    json_body['data'].each do |subnet|
+      item = {}
+      fields.each do |field| item[field.to_sym] = subnet[field.to_s] end
+      data.push(item)
+    end if json_body && json_body['data']
+    data
+  end
+
   def errors
     {
       :cidr => "A 'cidr' parameter for the subnet must be provided(e.g. 100.10.10.0/24)",

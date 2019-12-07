@@ -205,13 +205,15 @@ module Proxy::Phpipam
 
     # Adds an IP address to the specified subnet 
     #
-    # Inputs: 1. ip(string). IP address to be added.
-    #         2. subnet_id(integer). The id of the external ipam subnet
-    #         3. description(string). IP address description
+    # Inputs: 1. ip(string):    IP address to be added.
+    #         2. cidr(string):  The IPv4 or IPv6 subnet CIDR. (Examples: IPv4 - "100.10.10.0/24", IPv6 - "2001:db8:abcd:12::/124")
+    # 
     # Returns: Hash with "message" on success, or hash with "error" 
+    # 
     # Examples:
     #   Response if success: 
-    #     {"message":"IP 100.10.10.123 added to subnet 100.10.10.0/24 successfully."}
+    #     IPv4: {"message":"IP 100.10.10.123 added to subnet 100.10.10.0/24 successfully."}
+    #     IPv6: {"message":"IP 2001:db8:abcd:12::3 added to subnet 2001:db8:abcd:12::/124 successfully."}
     #   Response if :error =>   
     #     {"error":"The specified subnet does not exist in phpIPAM."}
     post '/add_ip_to_subnet' do
@@ -236,8 +238,9 @@ module Proxy::Phpipam
 
     # Deletes IP address from a given subnet
     #
-    # Inputs: 1. ip(string). IP address to be checked.
-    #         2. cidr(string): CIDR address in the format: "100.20.20.0/24"
+    # Inputs: 1. ip(string).   IP address to be checked.
+    #         2. cidr(string): The IPv4 or IPv6 subnet CIDR. (Examples: IPv4 - "100.10.10.0/24", IPv6 - "2001:db8:abcd:12::/124")
+    #
     # Returns: JSON object
     # Example:
     #   Response if success: 

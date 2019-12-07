@@ -38,9 +38,9 @@ module PhpipamHelper
 
   def errors
     {
-      :cidr => "A 'cidr' parameter for the subnet must be provided(e.g. 100.10.10.0/24)",
+      :cidr => "A 'cidr' parameter for the subnet must be provided(e.g. IPv4: 100.10.10.0/24, IPv6: 2001:db8:abcd:12::/124)",
       :mac => "A 'mac' address must be provided(e.g. 00:0a:95:9d:68:10)",
-      :ip => "Missing 'ip' parameter. An IPv4 address must be provided(e.g. 100.10.10.22)",
+      :ip => "Missing 'ip' parameter. An IPv4 or IPv6 address must be provided(e.g. IPv4: 100.10.10.22, IPv6: 2001:db8:abcd:12::3)",
       :section_name => "A 'section_name' must be provided",
       :no_free_ip => "There are no more free addresses in this subnet",
       :no_section => "Section not found in External IPAM.",

@@ -14,41 +14,43 @@ module Proxy::Phpipam
 
     # Gets the next available IP address based on a given subnet
     # 
-    # Input:   cidr(string): CIDR address in the format: "100.20.20.0/24"
-    # Returns: Hash with "next_ip", or hash with "error"
-    # Examples: 
-    #   Response if success: 
-    #     {"cidr":"100.20.20.0/24","next_ip":"100.20.20.11"}
-    #   Response if :error =>   
-    #     {"error":"The specified subnet does not exist in phpIPAM."}
-    get '/next_ip' do
+    # Inputs:   address:   Network address of the subnet(e.g. 100.55.55.0)
+    #           prefix:    Network prefix(e.g. 24)
+    # 
+    # Returns: Hash with next available IP address in "data", or hash with "message" containing
+    #          error message from phpIPAM.
+    #
+    # Response if success: 
+    #   {"code": 200, "success": true, "data": "100.55.55.3", "time": 0.012}
+    get '/subnet/:address/:prefix/next_ip' do
       content_type :json
 
       begin
-        err = validate_required_params(["cidr", "mac"], params)
+        err = validate_required_params(["address", "prefix", "mac"], params)
         return err if err.length > 0
 
-        cidr = params[:cidr]
         mac = params[:mac]
+        cidr = params[:address] + '/' + params[:prefix]
         phpipam_client = PhpipamClient.new
         subnet = JSON.parse(phpipam_client.get_subnet(cidr))
-
-        return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnet)
-
+        return {:code => subnet['code'], :error => subnet['message']}.to_json if no_subnets_found(subnet)
         ipaddr = phpipam_client.get_next_ip(subnet['data'][0]['id'], mac, cidr)
-
-        return {:error => errors[:no_free_ip]}.to_json if no_free_ip_found(JSON.parse(ipaddr))
+        return {:code => subnet['code'], :error => ipaddr['message']}.to_json if no_free_ip_found(JSON.parse(ipaddr))
 
         ipaddr
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        return {:error => errors[:no_connection]}.to_json
+        logger.debug(errors[:no_connection])
+        raise 
       end
     end
 
     # Gets the subnet from phpIPAM
     # 
-    # Input:   cidr(string): CIDR address in the format: "100.20.20.0/24"
+    # Inputs:   address:   Network address of the subnet
+    #           prefix:    Network prefix(e.g. 24)
+    # 
     # Returns: JSON with "data" key on success, or JSON with "error" key when there is an error
+    # 
     # Examples: 
     #   Response if subnet exists:
     #     {
@@ -64,17 +66,20 @@ module Proxy::Phpipam
     #     {
     #       "code":200,"success":0,"message":"No subnets found","time":0.01
     #     }
-    get '/get_subnet' do
+    get '/subnet/:address/:prefix' do
       content_type :json
 
       begin
-        err = validate_required_params(["cidr"], params)
+        err = validate_required_params(["address", "prefix"], params)
         return err if err.length > 0
 
+        cidr = params[:address] + '/' + params[:prefix]
+
         phpipam_client = PhpipamClient.new
-        phpipam_client.get_subnet(params[:cidr])
+        phpipam_client.get_subnet(cidr)
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        return {:error => errors[:no_connection]}.to_json
+        logger.debug(errors[:no_connection])
+        raise 
       end
     end
 
@@ -97,7 +102,8 @@ module Proxy::Phpipam
         phpipam_client = PhpipamClient.new
         phpipam_client.get_sections
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        return {:error => errors[:no_connection]}.to_json
+        logger.debug(errors[:no_connection])
+        raise 
       end
     end
 
@@ -163,51 +169,59 @@ module Proxy::Phpipam
         err = validate_required_params(["section_name"], params)
         return err if err.length > 0
  
-        section_name = URI.decode(params[:section_name])
+        section_name = CGI.unescape(params[:section_name])
         phpipam_client = PhpipamClient.new
         section = JSON.parse(phpipam_client.get_section(section_name))
 
-        return {:error => errors[:no_section]}.to_json if no_section_found(section)
+        return {:code => section['code'], :error => section['message']}.to_json if no_section_found(section)
 
         phpipam_client.get_subnets(section['data']['id'].to_s)
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        return {:error => errors[:no_connection]}.to_json
+        logger.debug(errors[:no_connection])
+        raise 
       end
     end
 
     # Checks whether an IP address has already been taken in external ipam.
     #
-    # Inputs: 1. ip(string). IP address to be checked.
-    #         2. cidr(string): CIDR address in the format: "100.20.20.0/24"
+    # Params: 1. address:   The network address of the IPv4 or IPv6 subnet.
+    #         2. prefix:    The subnet prefix(e.g. 24)
+    #         3. ip:        IP address to be queried
+    #
     # Returns: JSON object with 'exists' field being either true or false
+    # 
     # Example: 
     #   Response if exists: 
     #     {"ip":"100.20.20.18","exists":true}
     #   Response if not exists:
     #     {"ip":"100.20.20.18","exists":false}
-    get '/ip_exists' do
+    get '/subnet/:address/:prefix/:ip' do
       content_type :json 
 
       begin
-        err = validate_required_params(["cidr", "ip"], params)
+        err = validate_required_params(["address", "prefix", "ip"], params)
         return err if err.length > 0
 
+        ip = params[:ip]
+        cidr = params[:address] + '/' + params[:prefix]
         phpipam_client = PhpipamClient.new
-        subnet = JSON.parse(phpipam_client.get_subnet(params[:cidr]))
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr))
 
-        return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnet)
+        return {:code => subnet['code'], :error => subnet['message']}.to_json if no_subnets_found(subnet)
 
-        phpipam_client.ip_exists(params[:ip], subnet['data'][0]['id'])
+        phpipam_client.ip_exists(ip, subnet['data'][0]['id'])
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        return {:error => errors[:no_connection]}.to_json
+        logger.debug(errors[:no_connection])
+        raise 
       end
     end
 
-    # Adds an IP address to the specified subnet 
+    # Adds an IP address to the specified subnet
     #
-    # Inputs: 1. ip(string):    IP address to be added.
-    #         2. cidr(string):  The IPv4 or IPv6 subnet CIDR. (Examples: IPv4 - "100.10.10.0/24", IPv6 - "2001:db8:abcd:12::/124")
-    # 
+    # Params: 1. address:   The network address of the IPv4 or IPv6 subnet.
+    #         2. prefix:    The subnet prefix(e.g. 24)
+    #         3. ip:        IP address to be added
+    #
     # Returns: Hash with "message" on success, or hash with "error" 
     # 
     # Examples:
@@ -216,30 +230,32 @@ module Proxy::Phpipam
     #     IPv6: {"message":"IP 2001:db8:abcd:12::3 added to subnet 2001:db8:abcd:12::/124 successfully."}
     #   Response if :error =>   
     #     {"error":"The specified subnet does not exist in phpIPAM."}
-    post '/add_ip_to_subnet' do
+    post '/subnet/:address/:prefix/:ip' do
       content_type :json
 
       begin
-        err = validate_required_params(["cidr", "ip"], params)
+        err = validate_required_params(["address", "ip", "prefix"], params)
         return err if err.length > 0
 
         ip = params[:ip]
-        cidr = params[:cidr]
+        cidr = params[:address] + '/' + params[:prefix]
         phpipam_client = PhpipamClient.new
         subnet = JSON.parse(phpipam_client.get_subnet(cidr))
 
-        return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnet)
+        return {:code => subnet['code'], :error => subnet['message']}.to_json if no_subnets_found(subnet)
 
         phpipam_client.add_ip_to_subnet(ip, subnet['data'][0]['id'], 'Address auto added by Foreman')
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        return {:error => errors[:no_connection]}.to_json
+        logger.debug(errors[:no_connection])
+        raise 
       end
     end
 
     # Deletes IP address from a given subnet
     #
-    # Inputs: 1. ip(string).   IP address to be checked.
-    #         2. cidr(string): The IPv4 or IPv6 subnet CIDR. (Examples: IPv4 - "100.10.10.0/24", IPv6 - "2001:db8:abcd:12::/124")
+    # Params: 1. address:   The network address of the IPv4 or IPv6 subnet.
+    #         2. prefix:    The subnet prefix(e.g. 24)
+    #         3. ip:        IP address to be deleted
     #
     # Returns: JSON object
     # Example:
@@ -247,19 +263,19 @@ module Proxy::Phpipam
     #     {"code": 200, "success": true, "message": "Address deleted", "time": 0.017}
     #   Response if :error =>   
     #     {"code": 404, "success": 0, "message": "Address does not exist", "time": 0.008}
-    post '/delete_ip_from_subnet' do
+    delete '/subnet/:address/:prefix/:ip' do
       content_type :json
 
       begin
-        err = validate_required_params(["cidr", "ip"], params)
+        err = validate_required_params(["address", "prefix", "ip"], params)
         return err if err.length > 0
 
         ip = params[:ip]
-        cidr = params[:cidr]
+        cidr = params[:address] + '/' + params[:prefix]
         phpipam_client = PhpipamClient.new
         subnet = JSON.parse(phpipam_client.get_subnet(cidr))
 
-        return {:error => errors[:no_subnet]}.to_json if no_subnets_found(subnet)
+        return {:code => subnet['code'], :error => subnet['message']}.to_json if no_subnets_found(subnet)
 
         phpipam_client.delete_ip_from_subnet(ip, subnet['data'][0]['id'])
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET

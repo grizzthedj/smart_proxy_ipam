@@ -48,6 +48,9 @@ module Proxy::Phpipam
       response = get('sections/')
       json_body = JSON.parse(response.body)
       json_body['data'] = filter_fields(json_body, [:id, :name, :description])
+      logger.debug("=================")
+      logger.debug("SECTIONS JSON: " + json_body.to_s)
+      logger.debug("=================")
       response.body = json_body.to_json
       response.header['Content-Length'] = json_body.to_s.length
       response.body
@@ -83,7 +86,7 @@ module Proxy::Phpipam
       json_body = JSON.parse(response.body)
       subnet_hash = @@ip_cache[cidr.to_sym]
 
-      return {:error => json_body['message']}.to_json if json_body['message']
+      return {:code => json_body['code'], :error => json_body['message']}.to_json if json_body['message']
 
       if subnet_hash && subnet_hash.key?(mac.to_sym)
         json_body['data'] = @@ip_cache[cidr.to_sym][mac.to_sym][:ip]
@@ -99,8 +102,8 @@ module Proxy::Phpipam
           next_ip = find_new_ip(subnet_id, new_ip, mac, cidr)
         end
 
-        return {:error => "Unable to find another available IP address in subnet #{cidr}"}.to_json if next_ip.nil?
-        return {:error => "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{DEFAULT_CLEANUP_INTERVAL} seconds)."}.to_json unless usable_ip(next_ip, cidr)
+        return {:code => 404, :error => "Unable to find another available IP address in subnet #{cidr}"}.to_json if next_ip.nil?
+        return {:code => 404, :error => "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{DEFAULT_CLEANUP_INTERVAL} seconds)."}.to_json unless usable_ip(next_ip, cidr)
 
         json_body['data'] = next_ip
       end

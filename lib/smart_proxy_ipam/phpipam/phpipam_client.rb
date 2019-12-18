@@ -48,9 +48,6 @@ module Proxy::Phpipam
       response = get('sections/')
       json_body = JSON.parse(response.body)
       json_body['data'] = filter_fields(json_body, [:id, :name, :description])
-      logger.debug("=================")
-      logger.debug("SECTIONS JSON: " + json_body.to_s)
-      logger.debug("=================")
       response.body = json_body.to_json
       response.header['Content-Length'] = json_body.to_s.length
       response.body

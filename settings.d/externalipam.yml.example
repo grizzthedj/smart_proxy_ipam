@@ -1,7 +1,7 @@
 ---
 :enabled: true
 
-:external_ipam:
+:externalipam:
   :phpipam:
     :url: 'http://phpipam.example.com'
     :user: 'phpipam_api_user'

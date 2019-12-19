@@ -62,7 +62,7 @@ bundle exec smart-proxy start
 ```
 9. Navigate to Foreman UI at http://localhost:5000
 10. Add a Local Smart Proxy in the Foreman UI(Infrastructure => Smart Proxies)
-11. Ensure that the `external_ipam` feature is present on the proxy(http://localhost:8000/features)
+11. Ensure that the `External IPAM` feature is present on the proxy(http://localhost:8000/features)
 12. Create a Subnet, and associate the subnet to the `External IPAM` proxy
  
 ## Contributing

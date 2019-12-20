@@ -17,7 +17,7 @@ for how to install Foreman plugins
 
 Once plugin is installed, you can use phpIPAM to get the next available IP address for a subnet:
 
-1. Create a subnet in Foreman of IPAM type "External IPAM". Click on the `Proxy` tab and associate the subnet with a Smart Proxy that has the `external_ipam` feature enabled. _NOTE: This subnet must actually exist in phpIPAM. There is no integration with subnet creation at this time._
+1. Create a subnet in Foreman of IPAM type "External IPAM". Click on the `Proxy` tab and associate the subnet with a Smart Proxy that has the `External IPAM` feature enabled. _NOTE: This subnet must actually exist in phpIPAM. There is no integration with subnet creation at this time._
 2. Create a host in Foreman. When adding/editing interfaces, select the above created subnet, and the next available IP in the selected subnet will be pulled from phpIPAM, and displayed in the IPv4 address field. _NOTE: This is not supported for IPv6._
 
 ## Local development
@@ -47,14 +47,14 @@ gem 'foreman_ipam', :path => '/path/to/foreman_ipam'
 ```
 bundle install
 bundle exec rails db:migrate
-bundle exec rails db:seed    # This adds 'external_ipam' feature to Features table
+bundle exec rails db:seed    # This adds 'External IPAM' feature to Features table
 bundle exec foreman start
 ```
-6. Add the smart_proxy_phpipam plugin to `Gemfile.local.rb` in Smart Proxy bundler.d directory
+6. Add the smart_proxy_ipam plugin to `Gemfile.local.rb` in Smart Proxy bundler.d directory
 ```
 gem 'smart_proxy_ipam', :path => '/path/to/smart_proxy_ipam'
 ```
-7. Copy `config/settings.d/external_ipam.yml.example` to `config/settings.d/external_ipam.yml` and replace values with your phpIPAM URL and credentials.
+7. Copy `config/settings.d/externalipam.yml.example` to `config/settings.d/externalipam.yml` and replace values with your phpIPAM URL and credentials.
 8. From Smart Proxy root directory run ... 
 ```
 bundle install
@@ -62,8 +62,8 @@ bundle exec smart-proxy start
 ```
 9. Navigate to Foreman UI at http://localhost:5000
 10. Add a Local Smart Proxy in the Foreman UI(Infrastructure => Smart Proxies)
-11. Ensure that the `external_ipam` feature is present on the proxy(http://localhost:8000/features)
-12. Create a Subnet, and associate the subnet to the `external_ipam` proxy
+11. Ensure that the `External IPAM` feature is present on the proxy(http://localhost:8000/features)
+12. Create a Subnet, and associate the subnet to the `External IPAM` proxy
  
 ## Contributing
 

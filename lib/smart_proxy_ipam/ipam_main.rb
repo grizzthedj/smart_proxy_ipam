@@ -5,7 +5,7 @@ module Proxy::Ipam
 
   class << self
     def get_config
-      Proxy::Ipam::Plugin.settings.external_ipam
+      Proxy::Ipam::Plugin.settings.externalipam
     end
   end
 end

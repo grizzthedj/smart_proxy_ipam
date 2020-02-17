@@ -31,10 +31,15 @@ module Proxy::Phpipam
 
         mac = params[:mac]
         cidr = params[:address] + '/' + params[:prefix]
+        section_name = params[:group]
+
         phpipam_client = PhpipamClient.new
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr))
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
+
         return {:code => subnet['code'], :error => subnet['message']}.to_json if no_subnets_found(subnet)
-        ipaddr = phpipam_client.get_next_ip(subnet['data'][0]['id'], mac, cidr)
+
+        ipaddr = phpipam_client.get_next_ip(subnet['data']['id'], mac, cidr, section_name)
+        
         return {:code => subnet['code'], :error => ipaddr['message']}.to_json if no_free_ip_found(JSON.parse(ipaddr))
 
         ipaddr
@@ -95,12 +100,43 @@ module Proxy::Phpipam
     #   ]
     #   Response if :error =>   
     #     {"error":"Unable to connect to phpIPAM server"}
-    get '/sections' do
+    get '/groups' do
       content_type :json
 
       begin
         phpipam_client = PhpipamClient.new
         phpipam_client.get_sections
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+        logger.debug(errors[:no_connection])
+        raise 
+      end
+    end
+
+    # Get a single sections from external ipam
+    #
+    # Input: Section name
+    # Returns: A JSON section on success, hash with "error" key otherwise
+    # Examples
+    #   Response if success: 
+    #     {"code":200,"success":true,"data":{"id":"80","name":"Development #1","description":null,
+    #      "masterSection":"0","permissions":"[]","strictMode":"1","subnetOrdering":"default","order":null,
+    #      "editDate":"2020-02-11 10:57:01","showVLAN":"1","showVRF":"1","showSupernetOnly":"1","DNS":null},"time":0.004}
+    #   Response if not found: 
+    #     {"code":404,"error":"Not Found"}
+    #   Response if :error =>   
+    #     {"error":"Unable to connect to phpIPAM server"}
+    get '/groups/:group_name' do
+      content_type :json 
+
+      begin
+        err = validate_required_params(["group_name"], params)
+        return err if err.length > 0
+ 
+        phpipam_client = PhpipamClient.new
+        section = JSON.parse(phpipam_client.get_section(params[:group_name]))
+
+        return {:code => section['code'], :error => section['message']}.to_json if no_section_found(section)
+        section.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise 
@@ -162,16 +198,15 @@ module Proxy::Phpipam
     #     }
     #   Response if :error =>   
     #     {"error":"Unable to connect to External IPAM server"}
-    get '/sections/:section_name/subnets' do
+    get '/groups/:group_name/subnets' do
       content_type :json 
 
       begin
-        err = validate_required_params(["section_name"], params)
+        err = validate_required_params(["group_name"], params)
         return err if err.length > 0
- 
-        section_name = CGI.unescape(params[:section_name])
+
         phpipam_client = PhpipamClient.new
-        section = JSON.parse(phpipam_client.get_section(section_name))
+        section = JSON.parse(phpipam_client.get_section(params[:group_name]))
 
         return {:code => section['code'], :error => section['message']}.to_json if no_section_found(section)
 
@@ -204,12 +239,13 @@ module Proxy::Phpipam
 
         ip = params[:ip]
         cidr = params[:address] + '/' + params[:prefix]
+        section_name = params[:group]
         phpipam_client = PhpipamClient.new
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr))
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
 
         return {:code => subnet['code'], :error => subnet['message']}.to_json if no_subnets_found(subnet)
 
-        phpipam_client.ip_exists(ip, subnet['data'][0]['id'])
+        phpipam_client.ip_exists(ip, subnet['data']['id'])
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise 
@@ -239,12 +275,14 @@ module Proxy::Phpipam
 
         ip = params[:ip]
         cidr = params[:address] + '/' + params[:prefix]
+        section_name = URI.escape(params[:group])
+
         phpipam_client = PhpipamClient.new
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr))
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
 
         return {:code => subnet['code'], :error => subnet['message']}.to_json if no_subnets_found(subnet)
 
-        phpipam_client.add_ip_to_subnet(ip, subnet['data'][0]['id'], 'Address auto added by Foreman')
+        phpipam_client.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise 
@@ -272,14 +310,46 @@ module Proxy::Phpipam
 
         ip = params[:ip]
         cidr = params[:address] + '/' + params[:prefix]
+        section_name = URI.escape(params[:group])
         phpipam_client = PhpipamClient.new
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr))
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
 
         return {:code => subnet['code'], :error => subnet['message']}.to_json if no_subnets_found(subnet)
 
-        phpipam_client.delete_ip_from_subnet(ip, subnet['data'][0]['id'])
+        phpipam_client.delete_ip_from_subnet(ip, subnet['data']['id'])
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        return {:error => errors[:no_connection]}.to_json
+        logger.debug(errors[:no_connection])
+        raise 
+      end
+    end
+
+    # Checks whether a subnet exists in a specific section.
+    #
+    # Params: 1. address:   The network address of the IPv4 or IPv6 subnet.
+    #         2. prefix:    The subnet prefix(e.g. 24)
+    #         3. group:     The name of the section
+    #
+    # Returns: JSON object with 'data' field is exists, otherwise field with 'error'
+    # 
+    # Example: 
+    #   Response if exists: 
+    #     {"code":200,"success":true,"data":{"id":"147","subnet":"172.55.55.0","mask":"29","sectionId":"84","description":null,"linked_subnet":null,"firewallAddressObject":null,"vrfId":"0","masterSubnetId":"0","allowRequests":"0","vlanId":"0","showName":"0","device":"0","permissions":"[]","pingSubnet":"0","discoverSubnet":"0","resolveDNS":"0","DNSrecursive":"0","DNSrecords":"0","nameserverId":"0","scanAgent":"0","customer_id":null,"isFolder":"0","isFull":"0","tag":"2","threshold":"0","location":"0","editDate":null,"lastScan":null,"lastDiscovery":null,"calculation":{"Type":"IPv4","IP address":"\/","Network":"172.55.55.0","Broadcast":"172.55.55.7","Subnet bitmask":"29","Subnet netmask":"255.255.255.248","Subnet wildcard":"0.0.0.7","Min host IP":"172.55.55.1","Max host IP":"172.55.55.6","Number of hosts":"6","Subnet Class":false}},"time":0.009}
+    #   Response if not exists:
+    #     {"code":404,"error":"No subnet 172.66.66.0/29 found in section :group"}
+    get '/group/:group/subnet/:address/:prefix' do
+      content_type :json 
+
+      begin
+        err = validate_required_params(["address", "prefix", "group"], params)
+        return err if err.length > 0
+
+        cidr = params[:address] + '/' + params[:prefix]
+
+        phpipam_client = PhpipamClient.new
+        phpipam_client.get_subnet_by_section(cidr, params[:group])
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+        logger.debug(errors[:no_connection])
+        raise 
       end
     end
   end

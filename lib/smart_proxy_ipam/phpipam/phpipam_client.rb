@@ -4,6 +4,7 @@ require 'net/http'
 require 'monitor'
 require 'concurrent'
 require 'time'
+require 'uri'
 require 'smart_proxy_ipam/ipam'
 require 'smart_proxy_ipam/ipam_main'
 require 'smart_proxy_ipam/phpipam/phpipam_helper'
@@ -14,7 +15,7 @@ module Proxy::Phpipam
     include PhpipamHelper
 
     MAX_RETRIES = 5
-    DEFAULT_CLEANUP_INTERVAL = 120  # 2 mins
+    DEFAULT_CLEANUP_INTERVAL = 60  # 2 mins
     @@ip_cache = nil
     @@timer_task = nil
 
@@ -27,13 +28,35 @@ module Proxy::Phpipam
       start_cleanup_task if @@timer_task.nil?
     end
 
-    def get_subnet(cidr)
+    def get_subnet(cidr, section_name = nil)
+      if section_name.nil? || section_name.empty?
+        get_subnet_by_cidr(cidr)
+      else
+        get_subnet_by_section(cidr, section_name)
+      end
+    end
+
+    def get_subnet_by_section(cidr, section_name)
+      section = JSON.parse(get_section(section_name))
+      subnets = JSON.parse(get_subnets(section['data']['id']))
+      subnet_id = nil
+
+      subnets['data'].each do |subnet|
+        subnet_cidr = subnet['subnet'] + '/' + subnet['mask']
+        subnet_id = subnet['id'] if subnet_cidr == cidr
+      end
+      
+      return {:code => 404, :error => "No subnet #{cidr} found in section #{URI.unescape(section_name)}"}.to_json if subnet_id.nil?
+      
+      response = get("subnets/#{subnet_id.to_s}/")
+      response.body
+    end
+
+    def get_subnet_by_cidr(cidr)
       response = get("subnets/cidr/#{cidr.to_s}")
       json_body = JSON.parse(response.body)
-
       return response.body if no_subnets_found(json_body)
-
-      json_body['data'] = filter_fields(json_body, [:id, :subnet, :description, :mask])
+      json_body['data'] = filter_fields(json_body, [:id, :subnet, :description, :mask])[0]
       response.body = json_body.to_json
       response.header['Content-Length'] = json_body.to_s.length
       response.body
@@ -78,15 +101,17 @@ module Proxy::Phpipam
       response.body
     end
 
-    def get_next_ip(subnet_id, mac, cidr)
+    def get_next_ip(subnet_id, mac, cidr, section_name)
       response = get("subnets/#{subnet_id.to_s}/first_free/")
       json_body = JSON.parse(response.body)
-      subnet_hash = @@ip_cache[cidr.to_sym]
+      section = section_name.nil? ? "" : section_name
+      @@ip_cache[section.to_sym] = {} if @@ip_cache[section.to_sym].nil?
+      subnet_hash = @@ip_cache[section.to_sym][cidr.to_sym]
 
       return {:code => json_body['code'], :error => json_body['message']}.to_json if json_body['message']
 
       if subnet_hash && subnet_hash.key?(mac.to_sym)
-        json_body['data'] = @@ip_cache[cidr.to_sym][mac.to_sym][:ip]
+        json_body['data'] = @@ip_cache[section_name.to_sym][cidr.to_sym][mac.to_sym][:ip]
       else
         next_ip = nil
         new_ip = json_body['data']
@@ -94,9 +119,9 @@ module Proxy::Phpipam
 
         if ip_not_in_cache
           next_ip = new_ip.to_s
-          add_ip_to_cache(new_ip, mac, cidr)
+          add_ip_to_cache(new_ip, mac, cidr, section)
         else
-          next_ip = find_new_ip(subnet_id, new_ip, mac, cidr)
+          next_ip = find_new_ip(subnet_id, new_ip, mac, cidr, section)
         end
 
         return {:code => 404, :error => "Unable to find another available IP address in subnet #{cidr}"}.to_json if next_ip.nil?
@@ -119,49 +144,68 @@ module Proxy::Phpipam
     private
 
     # @@ip_cache structure
+    # 
+    # Groups of subnets are cached under the External IPAM Group name. For example,
+    # "IPAM Group Name" would be the section name in phpIPAM. All IP's cached for subnets
+    # that do not have an External IPAM group specified, they are cached under the "" key.
+    #
     # {  
-    #   "100.55.55.0/24":{  
-    #      "00:0a:95:9d:68:10": {"ip": "100.55.55.1", "timestamp": "2019-09-17 12:03:43 -D400"}
+    #   "": {
+    #     "100.55.55.0/24":{  
+    #       "00:0a:95:9d:68:10": {"ip": "100.55.55.1", "timestamp": "2019-09-17 12:03:43 -D400"}
+    #     },
     #   },
-    #   "123.11.33.0/24":{  
-    #      "00:0a:95:9d:68:33": {"ip": "123.11.33.1", "timestamp": "2019-09-17 12:04:43 -0400"}
-    #      "00:0a:95:9d:68:34": {"ip": "123.11.33.2", "timestamp": "2019-09-17 12:05:48 -0400"}
-    #      "00:0a:95:9d:68:35": {"ip": "123.11.33.3", "timestamp:: "2019-09-17 12:06:50 -0400"}
+    #   "IPAM Group Name": {
+    #     "123.11.33.0/24":{  
+    #       "00:0a:95:9d:68:33": {"ip": "123.11.33.1", "timestamp": "2019-09-17 12:04:43 -0400"},
+    #       "00:0a:95:9d:68:34": {"ip": "123.11.33.2", "timestamp": "2019-09-17 12:05:48 -0400"},
+    #       "00:0a:95:9d:68:35": {"ip": "123.11.33.3", "timestamp:: "2019-09-17 12:06:50 -0400"}
+    #     }
+    #   },
+    #   "Another IPAM Group": {
+    #     "185.45.39.0/24":{  
+    #       "00:0a:95:9d:68:55": {"ip": "185.45.39.1", "timestamp": "2019-09-17 12:04:43 -0400"},
+    #       "00:0a:95:9d:68:56": {"ip": "185.45.39.2", "timestamp": "2019-09-17 12:05:48 -0400"}
+    #     }
     #   }
     # }
     def init_cache
-      logger.debug("Clearing ip cache.")
       @@m.synchronize do
         if @@ip_cache and not @@ip_cache.empty?
-          @@ip_cache.each do |key, values|
-            values.each do |mac, value|
-              if Time.now - Time.parse(value[:timestamp]) > DEFAULT_CLEANUP_INTERVAL
-                @@ip_cache[key].delete(mac)
+          logger.debug("Processing ip cache.")
+          @@ip_cache.each do |section, subnets|
+            subnets.each do |cidr, macs|
+              macs.each do |mac, ip|
+                if Time.now - Time.parse(ip[:timestamp]) > DEFAULT_CLEANUP_INTERVAL
+                  @@ip_cache[section][cidr].delete(mac)
+                end
               end
+              @@ip_cache[section].delete(cidr) if @@ip_cache[section][cidr].nil? or @@ip_cache[section][cidr].empty?
             end
-            @@ip_cache.delete(key) if @@ip_cache[key].nil? or @@ip_cache[key].empty?
           end
         else
-          @@ip_cache = {}
+          logger.debug("Clearing ip cache.")
+          @@ip_cache = {:"" => {}}
         end
       end
     end
 
-    def add_ip_to_cache(ip, mac, cidr)
-      logger.debug("Adding IP #{ip} to cache for subnet #{cidr}")
+    def add_ip_to_cache(ip, mac, cidr, section_name)
+      logger.debug("Adding IP #{ip} to cache for subnet #{cidr} in section #{section_name}")
       @@m.synchronize do
         # Clear cache data which has the same mac and ip with the new one 
-        @@ip_cache.each do |key, values|
+        section_hash = @@ip_cache[section_name.to_sym]
+        section_hash.each do |key, values|
           if values.keys.include? mac.to_sym
-            @@ip_cache[key].delete(mac.to_sym)
+            @@ip_cache[section_name.to_sym][key].delete(mac.to_sym)
           end
-          @@ip_cache.delete(key) if @@ip_cache[key].nil? or @@ip_cache[key].empty?
+          @@ip_cache[section_name.to_sym].delete(key) if @@ip_cache[section_name.to_sym][key].nil? or @@ip_cache[section_name.to_sym][key].empty?
         end   
-        
-        if @@ip_cache.key?(cidr.to_sym)
-          @@ip_cache[cidr.to_sym][mac.to_sym] = {:ip => ip.to_s, :timestamp => Time.now.to_s}
+      
+        if section_hash.key?(cidr.to_sym)
+          @@ip_cache[section_name.to_sym][cidr.to_sym][mac.to_sym] = {:ip => ip.to_s, :timestamp => Time.now.to_s}
         else
-          @@ip_cache = @@ip_cache.merge({cidr.to_sym => {mac.to_sym => {:ip => ip.to_s, :timestamp => Time.now.to_s}}})
+          @@ip_cache = @@ip_cache.merge({section_name.to_sym => {cidr.to_sym => {mac.to_sym => {:ip => ip.to_s, :timestamp => Time.now.to_s}}}})
         end
       end
     end
@@ -169,7 +213,7 @@ module Proxy::Phpipam
     # Called when next available IP from external IPAM has been cached by another user/host, but 
     # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and 
     # see if it is available in external IPAM.
-    def find_new_ip(subnet_id, ip, mac, cidr)
+    def find_new_ip(subnet_id, ip, mac, cidr, section_name)
       found_ip = nil
       temp_ip = ip
       retry_count = 0
@@ -179,9 +223,9 @@ module Proxy::Phpipam
         verify_ip = JSON.parse(ip_exists(new_ip, subnet_id))
 
         # If new IP doesn't exist in IPAM and not in the cache
-        if ip_not_found_in_ipam(verify_ip) && !ip_exists_in_cache(new_ip, cidr, mac)
+        if ip_not_found_in_ipam(verify_ip) && !ip_exists_in_cache(new_ip, cidr, mac, section_name)
           found_ip = new_ip.to_s
-          add_ip_to_cache(found_ip, mac, cidr)
+          add_ip_to_cache(found_ip, mac, cidr, section_name)
           break
         end
 
@@ -200,8 +244,8 @@ module Proxy::Phpipam
       IPAddr.new(ip.to_s).succ.to_s
     end
 
-    def ip_exists_in_cache(ip, cidr, mac)
-      @@ip_cache[cidr.to_sym] && @@ip_cache[cidr.to_sym].to_s.include?(ip.to_s)      
+    def ip_exists_in_cache(ip, cidr, mac, section_name)
+      @@ip_cache[section_name.to_sym][cidr.to_sym] && @@ip_cache[section_name.to_sym][cidr.to_sym].to_s.include?(ip.to_s)      
     end
 
     # Checks if given IP is within a subnet. Broadcast address is considered unusable

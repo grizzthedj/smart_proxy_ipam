@@ -10,7 +10,7 @@ module PhpipamHelper
   end
 
   def no_subnets_found(subnet)
-    !subnet.kind_of?(Array) && subnet['message'] && subnet['message'].downcase == "no subnets found"
+    subnet['message'] && subnet['message'].downcase == "no subnets found"
   end
 
   def no_section_found(section)

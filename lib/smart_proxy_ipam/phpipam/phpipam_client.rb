@@ -36,9 +36,9 @@ module Proxy::Phpipam
       end
     end
 
-    def get_subnet_by_section(cidr, section_name)
+    def get_subnet_by_section(cidr, section_name, include_id = true)
       section = JSON.parse(get_section(section_name))
-      subnets = JSON.parse(get_subnets(section['data']['id']))
+      subnets = JSON.parse(get_subnets(section['data']['id'], include_id))
       subnet_id = nil
 
       subnets['data'].each do |subnet|
@@ -49,14 +49,19 @@ module Proxy::Phpipam
       return {:code => 404, :error => "No subnet #{cidr} found in section #{URI.unescape(section_name)}"}.to_json if subnet_id.nil?
       
       response = get("subnets/#{subnet_id.to_s}/")
+      json_body = JSON.parse(response.body)
+      json_body['data'] = filter_hash(json_body['data'], [:id, :subnet, :mask, :description]) if json_body['data']
+      json_body = filter_hash(json_body, [:code, :data, :error, :message])
+      response.body = json_body.to_json
+      response.header['Content-Length'] = json_body.to_s.length
       response.body
     end
 
     def get_subnet_by_cidr(cidr)
       response = get("subnets/cidr/#{cidr.to_s}")
       json_body = JSON.parse(response.body)
-      return response.body if no_subnets_found(json_body)
       json_body['data'] = filter_fields(json_body, [:id, :subnet, :description, :mask])[0]
+      json_body = filter_hash(json_body, [:code, :data, :error, :message])
       response.body = json_body.to_json
       response.header['Content-Length'] = json_body.to_s.length
       response.body
@@ -64,22 +69,31 @@ module Proxy::Phpipam
 
     def get_section(section_name)
       response = get("sections/#{section_name}/")
+      json_body = JSON.parse(response.body)
+      json_body['data'] = filter_hash(json_body['data'], [:id, :name, :description]) if json_body['data']
+      json_body = filter_hash(json_body, [:code, :data, :error, :message])
+      response.body = json_body.to_json
+      response.header['Content-Length'] = json_body.to_s.length
       response.body
     end
 
     def get_sections
       response = get('sections/')
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_fields(json_body, [:id, :name, :description])
+      json_body['data'] = filter_fields(json_body, [:id, :name, :description]) if json_body['data']
+      json_body = filter_hash(json_body, [:code, :data, :error, :message])
       response.body = json_body.to_json
       response.header['Content-Length'] = json_body.to_s.length
       response.body
     end
 
-    def get_subnets(section_id)
+    def get_subnets(section_id, include_id = true)
       response = get("sections/#{section_id}/subnets/")
+      fields = [:subnet, :mask, :description]
+      fields.push(:id) if include_id
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_fields(json_body, [:id, :subnet, :mask, :sectionId, :description])
+      json_body['data'] = filter_fields(json_body, fields) if json_body['data']
+      json_body = filter_hash(json_body, [:code, :data, :error, :message])
       response.body = json_body.to_json
       response.header['Content-Length'] = json_body.to_s.length
       response.body
@@ -87,17 +101,30 @@ module Proxy::Phpipam
 
     def ip_exists(ip, subnet_id)
       response = get("subnets/#{subnet_id.to_s}/addresses/#{ip}/")
+      json_body = JSON.parse(response.body)
+      json_body['data'] = filter_fields(json_body, [:ip]) if json_body['data']
+      json_body = filter_hash(json_body, [:code, :data, :error, :message])
+      response.body = json_body.to_json
+      response.header['Content-Length'] = json_body.to_s.length
       response.body
     end
 
     def add_ip_to_subnet(ip, subnet_id, desc)
       data = {:subnetId => subnet_id, :ip => ip, :description => desc}
       response = post('addresses/', data)
+      json_body = JSON.parse(response.body)
+      json_body = filter_hash(json_body, [:code, :error, :message])
+      response.body = json_body.to_json
+      response.header['Content-Length'] = json_body.to_s.length
       response.body
     end
 
     def delete_ip_from_subnet(ip, subnet_id)
       response = delete("addresses/#{ip}/#{subnet_id.to_s}/") 
+      json_body = JSON.parse(response.body)
+      json_body = filter_hash(json_body, [:code, :error, :message])
+      response.body = json_body.to_json
+      response.header['Content-Length'] = json_body.to_s.length
       response.body
     end
 
@@ -129,6 +156,8 @@ module Proxy::Phpipam
 
         json_body['data'] = next_ip
       end
+
+      json_body = {:code => json_body['code'], :data => json_body['data']}
 
       response.body = json_body.to_json
       response.header['Content-Length'] = json_body.to_s.length
@@ -223,7 +252,7 @@ module Proxy::Phpipam
         verify_ip = JSON.parse(ip_exists(new_ip, subnet_id))
 
         # If new IP doesn't exist in IPAM and not in the cache
-        if ip_not_found_in_ipam(verify_ip) && !ip_exists_in_cache(new_ip, cidr, mac, section_name)
+        if ip_not_found_in_ipam?(verify_ip) && !ip_exists_in_cache(new_ip, cidr, mac, section_name)
           found_ip = new_ip.to_s
           add_ip_to_cache(found_ip, mac, cidr, section_name)
           break

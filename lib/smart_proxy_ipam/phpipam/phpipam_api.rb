@@ -138,8 +138,7 @@ module Proxy::Phpipam
         phpipam_client = PhpipamClient.new
         section = JSON.parse(phpipam_client.get_section(params[:group]))
 
-        return {:code => section['code'], :error => section['message']}.to_json if no_section_found?(section)
-        puts "SECTION: " + section.to_json
+        return {:code => section['code'], :message => section['message']}.to_json if no_section_found?(section)
         section.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])

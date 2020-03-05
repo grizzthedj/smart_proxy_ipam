@@ -176,12 +176,16 @@ module Proxy::Phpipam
     # 
     # Groups of subnets are cached under the External IPAM Group name. For example,
     # "IPAM Group Name" would be the section name in phpIPAM. All IP's cached for subnets
-    # that do not have an External IPAM group specified, they are cached under the "" key.
+    # that do not have an External IPAM group specified, they are cached under the "" key. IP's 
+    # are cached using one of two possible keys: 
+    #    1). Mac Address
+    #    2). UUID (Used when Mac Address not specified)
     #
     # {  
     #   "": {
     #     "100.55.55.0/24":{  
-    #       "00:0a:95:9d:68:10": {"ip": "100.55.55.1", "timestamp": "2019-09-17 12:03:43 -D400"}
+    #       "00:0a:95:9d:68:10": {"ip": "100.55.55.1", "timestamp": "2019-09-17 12:03:43 -D400"},
+    #       "906d8bdc-dcc0-4b59-92cb-665935e21662": {"ip": "100.55.55.2", "timestamp": "2019-09-17 11:43:22 -D400"}
     #     },
     #   },
     #   "IPAM Group Name": {
@@ -223,18 +227,21 @@ module Proxy::Phpipam
       logger.debug("Adding IP #{ip} to cache for subnet #{cidr} in section #{section_name}")
       @@m.synchronize do
         # Clear cache data which has the same mac and ip with the new one 
+
+        mac_addr = (mac.nil? || mac.empty?) ? SecureRandom.uuid : mac
         section_hash = @@ip_cache[section_name.to_sym]
+
         section_hash.each do |key, values|
-          if values.keys.include? mac.to_sym
-            @@ip_cache[section_name.to_sym][key].delete(mac.to_sym)
+          if values.keys.include? mac_addr.to_sym
+            @@ip_cache[section_name.to_sym][key].delete(mac_addr.to_sym)
           end
           @@ip_cache[section_name.to_sym].delete(key) if @@ip_cache[section_name.to_sym][key].nil? or @@ip_cache[section_name.to_sym][key].empty?
         end   
       
         if section_hash.key?(cidr.to_sym)
-          @@ip_cache[section_name.to_sym][cidr.to_sym][mac.to_sym] = {:ip => ip.to_s, :timestamp => Time.now.to_s}
+          @@ip_cache[section_name.to_sym][cidr.to_sym][mac_addr.to_sym] = {:ip => ip.to_s, :timestamp => Time.now.to_s}
         else
-          @@ip_cache = @@ip_cache.merge({section_name.to_sym => {cidr.to_sym => {mac.to_sym => {:ip => ip.to_s, :timestamp => Time.now.to_s}}}})
+          @@ip_cache = @@ip_cache.merge({section_name.to_sym => {cidr.to_sym => {mac_addr.to_sym => {:ip => ip.to_s, :timestamp => Time.now.to_s}}}})
         end
       end
     end

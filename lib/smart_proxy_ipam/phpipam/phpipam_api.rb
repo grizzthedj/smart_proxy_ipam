@@ -34,6 +34,8 @@ module Proxy::Phpipam
         section_name = params[:group]
 
         phpipam_client = PhpipamClient.new
+        return auth_error unless phpipam_client.authenticated?
+
         subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
 
         return {:code => subnet['code'], :error => subnet['error']}.to_json if no_subnets_found?(subnet)
@@ -82,6 +84,8 @@ module Proxy::Phpipam
         cidr = params[:address] + '/' + params[:prefix]
 
         phpipam_client = PhpipamClient.new
+        return auth_error unless phpipam_client.authenticated?
+
         phpipam_client.get_subnet(cidr)
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
@@ -106,8 +110,11 @@ module Proxy::Phpipam
 
       begin
         phpipam_client = PhpipamClient.new
+        return auth_error unless phpipam_client.authenticated?
+
         sections = phpipam_client.get_sections
         return {:code => 200, :data => []}.to_json if no_sections_found?(JSON.parse(sections))
+
         sections
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
@@ -136,9 +143,11 @@ module Proxy::Phpipam
         return err if err.length > 0
  
         phpipam_client = PhpipamClient.new
+        return auth_error unless phpipam_client.authenticated?
+        
         section = JSON.parse(phpipam_client.get_section(params[:group]))
-
         return {:code => section['code'], :message => section['message']}.to_json if no_section_found?(section)
+
         section.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
@@ -209,8 +218,9 @@ module Proxy::Phpipam
         return err if err.length > 0
 
         phpipam_client = PhpipamClient.new
-        section = JSON.parse(phpipam_client.get_section(params[:group]))
+        return auth_error unless phpipam_client.authenticated?
 
+        section = JSON.parse(phpipam_client.get_section(params[:group]))
         return {:code => 404, :error => errors[:no_section]}.to_json if no_section_found?(section)
 
         phpipam_client.get_subnets(section['data']['id'].to_s, false)
@@ -243,9 +253,11 @@ module Proxy::Phpipam
         ip = params[:ip]
         cidr = params[:address] + '/' + params[:prefix]
         section_name = params[:group]
-        phpipam_client = PhpipamClient.new
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
 
+        phpipam_client = PhpipamClient.new
+        return auth_error unless phpipam_client.authenticated?
+        
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
         return {:code => 404, :error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
         ip_exists = JSON.parse(phpipam_client.ip_exists(ip, subnet['data']['id']))
@@ -287,8 +299,9 @@ module Proxy::Phpipam
         section_name = URI.escape(params[:group])
 
         phpipam_client = PhpipamClient.new
+        return auth_error unless phpipam_client.authenticated?
+        
         subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
-
         return {:code => 404, :error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
         add_ip = JSON.parse(phpipam_client.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman'))
@@ -327,8 +340,9 @@ module Proxy::Phpipam
         cidr = params[:address] + '/' + params[:prefix]
         section_name = URI.escape(params[:group])
         phpipam_client = PhpipamClient.new
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
+        return auth_error unless phpipam_client.authenticated?
 
+        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
         return {:code => 404, :error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
         delete_ip = JSON.parse(phpipam_client.delete_ip_from_subnet(ip, subnet['data']['id']))
@@ -367,6 +381,8 @@ module Proxy::Phpipam
         cidr = params[:address] + '/' + params[:prefix]
 
         phpipam_client = PhpipamClient.new
+        return auth_error unless phpipam_client.authenticated?
+
         phpipam_client.get_subnet_by_section(cidr, params[:group])
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])

@@ -26,6 +26,7 @@ module Proxy::Phpipam
       @@m = Monitor.new
       init_cache if @@ip_cache.nil?
       start_cleanup_task if @@timer_task.nil?
+      authenticate
     end
 
     def get_subnet(cidr, section_name = nil)
@@ -170,6 +171,10 @@ module Proxy::Phpipam
       @@timer_task.execute
     end
 
+    def authenticated?
+      !@token.nil?
+    end
+
     private
 
     # @@ip_cache structure
@@ -291,7 +296,6 @@ module Proxy::Phpipam
     end
 
     def get(path)
-      authenticate
       uri = URI(@api_base + path)
       request = Net::HTTP::Get.new(uri)
       request['token'] = @token
@@ -302,7 +306,6 @@ module Proxy::Phpipam
     end
 
     def delete(path, body=nil)
-      authenticate
       uri = URI(@api_base + path)
       uri.query = URI.encode_www_form(body) if body
       request = Net::HTTP::Delete.new(uri)
@@ -314,7 +317,6 @@ module Proxy::Phpipam
     end
 
     def post(path, body=nil)
-      authenticate
       uri = URI(@api_base + path)
       uri.query = URI.encode_www_form(body) if body
       request = Net::HTTP::Post.new(uri)
@@ -335,7 +337,8 @@ module Proxy::Phpipam
       }
 
       response = JSON.parse(response.body)
-      @token = response['data']['token']
+      logger.warn(response['message']) if response['message']
+      @token = response.dig('data', 'token')
     end    
   end
 end

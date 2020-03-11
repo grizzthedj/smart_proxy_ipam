@@ -28,6 +28,10 @@ module PhpipamHelper
   def ip_not_found_in_ipam?(ip)
     ip && ip['message'] && ip['message'].downcase == 'no addresses found'
   end
+
+  def auth_error
+    {:code => 401, :error => "Invalid username and password for External IPAM"}.to_json
+  end
   
   # Returns an array of hashes with only the fields given in the fields param
   def filter_fields(json_body, fields)

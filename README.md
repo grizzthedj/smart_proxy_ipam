@@ -17,8 +17,8 @@ for how to install Foreman plugins
 
 Once plugin is installed, you can use phpIPAM to get the next available IP address for a subnet:
 
-1. Create a subnet in Foreman of IPAM type "External IPAM". Click on the `Proxy` tab and associate the subnet with a Smart Proxy that has the `External IPAM` feature enabled. _NOTE: This subnet must actually exist in phpIPAM. There is no integration with subnet creation at this time._
-2. Create a host in Foreman. When adding/editing interfaces, select the above created subnet, and the next available IP in the selected subnet will be pulled from phpIPAM, and displayed in the IPv4 address field. _NOTE: This is not supported for IPv6._
+1. Create a subnet in Foreman of IPAM type "External IPAM". Click on the `Proxy` tab and associate the subnet with a Smart Proxy that has the `externalipam` feature enabled. _NOTE: This subnet must actually exist in phpIPAM. There is no integration with subnet creation at this time._
+2. Create a host in Foreman. When adding/editing interfaces, select the above created subnet, and the next available IP in the selected subnet will be pulled from phpIPAM, and displayed in the IPv4/IPv6 address field. 
 
 ## Local development
 

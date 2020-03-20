@@ -63,7 +63,9 @@ bundle exec smart-proxy start
 9. Navigate to Foreman UI at http://localhost:5000
 10. Add a Local Smart Proxy in the Foreman UI(Infrastructure => Smart Proxies)
 11. Ensure that the `External IPAM` feature is present on the proxy(http://localhost:8000/features)
-12. Create a Subnet, and associate the subnet to the `External IPAM` proxy
+12. Create a Subnet(IPv4 or IPv6), and associate the subnet with the `External IPAM` proxy. Subnet must exist in phpIPAM.
+13. Create a Host, and select an External IPAM Subnet to obtain the next available IP from phpIPAM
+NOTE: For IPv6 subnets only, if the subnet has no addresses reserved(i.e. empty), the first address returned is actually the network address(e.g. `fd13:6d20:29dc:cf27::`), which is not a valid IP. This is a bug within phpIPAM itself
  
 ## Contributing
 

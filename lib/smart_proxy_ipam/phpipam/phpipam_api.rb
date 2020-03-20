@@ -38,12 +38,12 @@ module Proxy::Phpipam
 
         subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
 
-        return {:code => subnet['code'], :error => subnet['error']}.to_json if no_subnets_found?(subnet)
+        return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
         ipaddr = phpipam_client.get_next_ip(subnet['data']['id'], mac, cidr, section_name)
         ipaddr_parsed = JSON.parse(ipaddr)
 
-        return {:code => 404, :error => ipaddr_parsed['error']}.to_json if no_free_ip_found?(ipaddr_parsed)
+        return {:error => ipaddr_parsed['error']}.to_json if no_free_ip_found?(ipaddr_parsed)
 
         ipaddr
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
@@ -113,7 +113,7 @@ module Proxy::Phpipam
         return auth_error unless phpipam_client.authenticated?
 
         sections = phpipam_client.get_sections
-        return {:code => 200, :data => []}.to_json if no_sections_found?(JSON.parse(sections))
+        return {:data => []}.to_json if no_sections_found?(JSON.parse(sections))
 
         sections
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
@@ -122,7 +122,7 @@ module Proxy::Phpipam
       end
     end
 
-    # Get a single sections from external ipam
+    # Get a single section from external ipam
     #
     # Input: Section name
     # Returns: A JSON section on success, hash with "error" key otherwise
@@ -146,9 +146,9 @@ module Proxy::Phpipam
         return auth_error unless phpipam_client.authenticated?
         
         section = JSON.parse(phpipam_client.get_section(params[:group]))
-        return {:code => section['code'], :message => section['message']}.to_json if no_section_found?(section)
+        return {}.to_json if no_section_found?(section)
 
-        section.to_json
+        section['data'].to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise 
@@ -221,7 +221,7 @@ module Proxy::Phpipam
         return auth_error unless phpipam_client.authenticated?
 
         section = JSON.parse(phpipam_client.get_section(params[:group]))
-        return {:code => 404, :error => errors[:no_section]}.to_json if no_section_found?(section)
+        return {:error => errors[:no_section]}.to_json if no_section_found?(section)
 
         phpipam_client.get_subnets(section['data']['id'].to_s, false)
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
@@ -258,14 +258,15 @@ module Proxy::Phpipam
         return auth_error unless phpipam_client.authenticated?
         
         subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
-        return {:code => 404, :error => subnet['error']}.to_json if no_subnets_found?(subnet)
+        return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
-        ip_exists = JSON.parse(phpipam_client.ip_exists(ip, subnet['data']['id']))
+        response = phpipam_client.ip_exists(ip, subnet['data']['id'])
+        ip_exists = JSON.parse(response.body)
 
         if ip_exists['data']
-          return {:code => 200, :exists => true}.to_json
+          return Net::HTTPFound.new('HTTP/1.1', 200, 'Found').to_json
         else
-          return {:code => 404, :exists => false}.to_json 
+          return Net::HTTPNotFound.new('HTTP/1.1', 404, 'Not Found').to_json
         end
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
@@ -302,14 +303,15 @@ module Proxy::Phpipam
         return auth_error unless phpipam_client.authenticated?
         
         subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
-        return {:code => 404, :error => subnet['error']}.to_json if no_subnets_found?(subnet)
+        return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
-        add_ip = JSON.parse(phpipam_client.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman'))
+        response = phpipam_client.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
+        add_ip = JSON.parse(response.body)
 
         if add_ip['message'] && add_ip['message'] == "Address created"
-          return {:code => 200}.to_json
+          return Net::HTTPCreated.new('HTTP/1.1', 201, 'Created').to_json
         else
-          return {:code => 500, :error => add_ip['message']}.to_json
+          return {:error => add_ip['message']}.to_json
         end
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
@@ -343,14 +345,15 @@ module Proxy::Phpipam
         return auth_error unless phpipam_client.authenticated?
 
         subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
-        return {:code => 404, :error => subnet['error']}.to_json if no_subnets_found?(subnet)
+        return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
-        delete_ip = JSON.parse(phpipam_client.delete_ip_from_subnet(ip, subnet['data']['id']))
+        response = phpipam_client.delete_ip_from_subnet(ip, subnet['data']['id'])
+        delete_ip = JSON.parse(response.body)
 
         if delete_ip['message'] && delete_ip['message'] == "Address deleted"
-          return {:code => 200}.to_json
-        else 
-          return {:code => 500, :error => delete_ip['message']}.to_json
+          return Net::HTTPOK.new('HTTP/1.1', 200, 'Address Deleted').to_json
+        else
+          return {:error => delete_ip['message']}.to_json
         end
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])

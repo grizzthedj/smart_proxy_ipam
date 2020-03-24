@@ -228,6 +228,7 @@ module Proxy::Phpipam
       validate_required_params!([:address, :prefix, :ip], params)
       ip = validate_ip!(params[:ip])
       cidr = validate_cidr!(params[:address], params[:prefix])
+      validate_ip_in_cidr!(ip, cidr)
 
       begin
         section_name = params[:group]
@@ -269,6 +270,7 @@ module Proxy::Phpipam
       validate_required_params!([:address, :ip, :prefix], params)
       ip = validate_ip!(params[:ip])
       cidr = validate_cidr!(params[:address], params[:prefix])
+      validate_ip_in_cidr!(ip, cidr)
 
       begin
         section_name = URI.escape(params[:group])
@@ -309,6 +311,7 @@ module Proxy::Phpipam
       validate_required_params!([:address, :prefix, :ip], params)
       ip = validate_ip!(params[:ip])
       cidr = validate_cidr!(params[:address], params[:prefix])
+      validate_ip_in_cidr!(ip, cidr)
 
       begin
         section_name = URI.escape(params[:group])

@@ -20,6 +20,12 @@ module PhpipamHelper
     log_halt 400, {error: e.to_s}.to_json
   end
 
+  def validate_ip_in_cidr!(ip, cidr)
+    unless IPAddr.new(cidr).include?(IPAddr.new(ip))
+      log_halt 400, {error: "IP #{ip} is not in #{cidr}"}.to_json
+    end
+  end
+
   def check_subnet_exists!(subnet)
     if subnet['error'] && subnet['error'].downcase == "no subnets found"
       log_halt 404, {error: 'No subnet found'}.to_json

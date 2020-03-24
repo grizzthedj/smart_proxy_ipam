@@ -240,7 +240,7 @@ module Proxy::Phpipam
         ip_exists = JSON.parse(response.body)
 
         unless ip_exists['data']
-          log_halt 404, {error: "IP #{ip} was not found in subnet #{cidr}"}.to_json
+          halt 404, {error: "IP #{ip} was not found in subnet #{cidr}"}.to_json
         end
 
         {ip: ip}
@@ -282,7 +282,7 @@ module Proxy::Phpipam
         add_ip = JSON.parse(response.body)
 
         unless add_ip['message'] && add_ip['message'] == "Address created"
-          log_halt 500, {error: add_ip['message']}.to_json
+          halt 500, {error: add_ip['message']}.to_json
         end
 
         status 201
@@ -324,7 +324,7 @@ module Proxy::Phpipam
 
         unless delete_ip['message'] && delete_ip['message'] == "Address deleted"
           # TODO: this can be anything, also address didn't exist
-          log_halt 500, {error: delete_ip['message']}.to_json
+          halt 500, {error: delete_ip['message']}.to_json
         end
 
         status 204

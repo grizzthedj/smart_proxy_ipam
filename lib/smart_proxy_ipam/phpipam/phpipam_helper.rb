@@ -1,34 +1,34 @@
 module PhpipamHelper
   def validate_required_params!(required_params, params)
     err = required_params.select { |param| params[param] }.map { |param| errors[param] }
-    log_halt 400, {error: err}.to_json unless err.emtpy?
+    halt 400, {error: err}.to_json unless err.empty?
   end
 
   def validate_ip!(ip)
     IPAddr.new(ip).to_s
   rescue IPAddr::InvalidAddressError => e
-    log_halt 400, {error: e.to_s}.to_json
+    halt 400, {error: e.to_s}.to_json
   end
 
   def validate_cidr!(address, prefix)
     cidr = "#{address}/#{prefix}"
     if IPAddr.new(cidr).to_s != IPAddr.new(address).to_s
-      log_halt 400, {error: "Network address #{address} should be #{network} with prefix #{prefix}"}.to_json
+      halt 400, {error: "Network address #{address} should be #{network} with prefix #{prefix}"}.to_json
     end
     cidr
   rescue IPAddr::Error => e
-    log_halt 400, {error: e.to_s}.to_json
+    halt 400, {error: e.to_s}.to_json
   end
 
   def validate_ip_in_cidr!(ip, cidr)
     unless IPAddr.new(cidr).include?(IPAddr.new(ip))
-      log_halt 400, {error: "IP #{ip} is not in #{cidr}"}.to_json
+      halt 400, {error: "IP #{ip} is not in #{cidr}"}.to_json
     end
   end
 
   def check_subnet_exists!(subnet)
     if subnet['error'] && subnet['error'].downcase == "no subnets found"
-      log_halt 404, {error: 'No subnet found'}.to_json
+      halt 404, {error: 'No subnet found'}.to_json
     end
   end
 
@@ -60,7 +60,7 @@ module PhpipamHelper
     @provider ||= begin
                     phpipam_client = PhpipamClient.new
                     unless phpipam_client.authenticated?
-                      log_halt 500, {error: 'Invalid username and password for External IPAM'}.to_json
+                      halt 500, {error: 'Invalid username and password for External IPAM'}.to_json
                     end
                     phpipam_client
                   end

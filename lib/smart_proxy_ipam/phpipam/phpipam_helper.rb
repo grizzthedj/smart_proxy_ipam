@@ -4,6 +4,12 @@ module PhpipamHelper
     log_halt 400, {error: err}.to_json unless err.emtpy?
   end
 
+  def check_subnet_exists!(subnet)
+    if subnet['error'] && subnet['error'].downcase == "no subnets found"
+      log_halt 404, {error: 'No subnet found'}.to_json
+    end
+  end
+
   def no_subnets_found?(subnet)
     subnet['error'] && subnet['error'].downcase == "no subnets found"
   end

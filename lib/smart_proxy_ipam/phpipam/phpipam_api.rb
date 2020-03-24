@@ -33,8 +33,7 @@ module Proxy::Phpipam
         section_name = params[:group]
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
-
-        return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
+        check_subnet_exists!(subnet)
 
         ipaddr = provider.get_next_ip(subnet['data']['id'], mac, cidr, section_name)
         ipaddr_parsed = JSON.parse(ipaddr)
@@ -235,7 +234,7 @@ module Proxy::Phpipam
         section_name = params[:group]
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
-        return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
+        check_subnet_exists!(subnet)
 
         response = provider.ip_exists(ip, subnet['data']['id'])
         ip_exists = JSON.parse(response.body)
@@ -276,7 +275,7 @@ module Proxy::Phpipam
         section_name = URI.escape(params[:group])
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
-        return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
+        check_subnet_exists!(subnet)
 
         response = provider.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
         add_ip = JSON.parse(response.body)
@@ -315,7 +314,7 @@ module Proxy::Phpipam
         section_name = URI.escape(params[:group])
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
-        return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
+        check_subnet_exists!(subnet)
 
         response = provider.delete_ip_from_subnet(ip, subnet['data']['id'])
         delete_ip = JSON.parse(response.body)

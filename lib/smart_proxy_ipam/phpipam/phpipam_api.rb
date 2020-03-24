@@ -233,18 +233,15 @@ module Proxy::Phpipam
         subnet = provider.get_subnet(cidr, section_name)
         check_subnet_exists!(subnet)
 
-        response = provider.ip_exists(ip, subnet['data']['id'])
-        ip_exists = JSON.parse(response.body)
-
-        unless ip_exists['data']
+        unless provider.ip_exists?(ip, subnet['data']['id'])
           halt 404, {error: "IP #{ip} was not found in subnet #{cidr}"}.to_json
         end
-
-        {ip: ip}
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise
       end
+
+      {ip: ip}.to_json
     end
 
     # Adds an IP address to the specified subnet

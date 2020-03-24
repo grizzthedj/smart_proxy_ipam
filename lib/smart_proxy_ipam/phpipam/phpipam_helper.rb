@@ -36,10 +36,6 @@ module PhpipamHelper
     subnet['error'] && subnet['error'].downcase == "no subnets found"
   end
 
-  def ip_not_found_in_ipam?(ip)
-    ip && ip['message'] && ip['message'].downcase == 'no addresses found'
-  end
-
   def auth_error
     {:code => 401, :error => "Invalid username and password for External IPAM"}.to_json
   end

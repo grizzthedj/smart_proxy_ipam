@@ -102,14 +102,13 @@ module Proxy::Phpipam
       filter_hash(json_body, [:data, :error, :message])
     end
 
-    def ip_exists(ip, subnet_id)
-      response = get("subnets/#{subnet_id.to_s}/addresses/#{ip}/")
+    def ip_exists?(ip, subnet_id)
+      response = get("subnets/#{subnet_id}/addresses/#{ip}/")
+      return false if response.code == 404
+
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_fields(json_body, [:ip]) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response
+      return false if ip['message'] && ip['message'].downcase == 'no addresses found'
+      !json_body['data'].nil?
     end
 
     def add_ip_to_subnet(ip, subnet_id, desc)
@@ -264,10 +263,8 @@ module Proxy::Phpipam
 
       loop do
         new_ip = increment_ip(temp_ip)
-        verify_ip = JSON.parse(ip_exists(new_ip, subnet_id).body)
 
-        # If new IP doesn't exist in IPAM and not in the cache
-        if ip_not_found_in_ipam?(verify_ip) && !ip_exists_in_cache(new_ip, cidr, mac, section_name)
+        if ip_exists?(new_ip, subnet_id) && !ip_exists_in_cache(new_ip, cidr, mac, section_name)
           found_ip = new_ip.to_s
           add_ip_to_cache(found_ip, mac, cidr, section_name)
           break

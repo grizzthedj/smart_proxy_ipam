@@ -100,7 +100,7 @@ module Proxy::Phpipam
 
       begin
         sections = provider.get_sections
-        return {:data => []}.to_json if no_sections_found?(JSON.parse(sections))
+        return {:data => []}.to_json unless sections
 
         sections
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET

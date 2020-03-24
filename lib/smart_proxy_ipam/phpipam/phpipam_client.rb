@@ -86,12 +86,15 @@ module Proxy::Phpipam
 
     def get_sections
       response = get('sections/')
+      return nil if response.code == 404
+
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_fields(json_body, [:id, :name, :description]) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+      return nil unless json_body['data']
+      # TODO is this redundant and is the HTTP 404 code reliable?
+      return nil if sections['message'] && sections['message'].downcase == "no sections available"
+
+      json_body['data'] = filter_fields(json_body, [:id, :name, :description])
+      filter_hash(json_body, [:data, :error, :message])
     end
 
     def get_subnets(section_id, include_id = true)

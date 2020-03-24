@@ -199,9 +199,9 @@ module Proxy::Phpipam
 
       begin
         section = provider.get_section(params[:group])
-        return {:error => errors[:no_section]}.to_json unless section
+        halt 404, {:error => errors[:no_section]}.to_json unless section
 
-        provider.get_subnets(section['id'].to_s, false)
+        provider.get_subnets(section['id'].to_s, false).to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise

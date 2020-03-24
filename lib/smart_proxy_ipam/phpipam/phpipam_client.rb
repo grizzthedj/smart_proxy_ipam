@@ -41,7 +41,7 @@ module Proxy::Phpipam
       section = get_section(section_name)
       return {:error => "No section #{section_name} found"}.to_json unless section
 
-      subnets = JSON.parse(get_subnets(section['id'], include_id))
+      subnets = get_subnets(section['id'], include_id)
       subnet_id = nil
 
       subnets['data'].each do |subnet|
@@ -98,15 +98,13 @@ module Proxy::Phpipam
     end
 
     def get_subnets(section_id, include_id = true)
-      response = get("sections/#{section_id}/subnets/")
       fields = [:subnet, :mask, :description]
-      fields.push(:id) if include_id
+      fields << :id if include_id
+
+      response = get("sections/#{section_id}/subnets/")
       json_body = JSON.parse(response.body)
       json_body['data'] = filter_fields(json_body, fields) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+      filter_hash(json_body, [:data, :error, :message])
     end
 
     def ip_exists(ip, subnet_id)

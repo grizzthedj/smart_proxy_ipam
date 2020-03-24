@@ -32,14 +32,6 @@ module PhpipamHelper
     end
   end
 
-  def no_subnets_found?(subnet)
-    subnet['error'] && subnet['error'].downcase == "no subnets found"
-  end
-
-  def auth_error
-    {:code => 401, :error => "Invalid username and password for External IPAM"}.to_json
-  end
-
   def provider
     @provider ||= begin
                     phpipam_client = PhpipamClient.new

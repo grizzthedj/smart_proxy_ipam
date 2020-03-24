@@ -27,7 +27,7 @@ module PhpipamHelper
   end
 
   def check_subnet_exists!(subnet)
-    if subnet['error'] && subnet['error'].downcase == "no subnets found"
+    if !subnet || subnet['error'] && subnet['error'].downcase == "no subnets found"
       halt 404, {error: 'No subnet found'}.to_json
     end
   end

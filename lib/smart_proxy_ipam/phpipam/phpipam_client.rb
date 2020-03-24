@@ -39,36 +39,31 @@ module Proxy::Phpipam
 
     def get_subnet_by_section(cidr, section_name, include_id = true)
       section = get_section(section_name)
-      return {:error => "No section #{section_name} found"}.to_json unless section
+      # TODO: raise exception?
+      return {:error => "No section #{section_name} found"} unless section
 
       subnets = get_subnets(section['id'], include_id)
-      subnet_id = nil
 
-      subnets['data'].each do |subnet|
-        subnet_cidr = subnet['subnet'] + '/' + subnet['mask']
-        subnet_id = subnet['id'] if subnet_cidr == cidr
-      end
-
-      return {}.to_json if subnet_id.nil?
+      subnet = subnets['data'].find { |subnet| "#{subnet['subnet']}/#{subnet['mask']}" == cidr }
+      return nil unless subnet
 
       response = get("subnets/#{subnet_id.to_s}/")
+      return nil if response.code == 404
+
       json_body = JSON.parse(response.body)
       json_body['data'] = filter_hash(json_body['data'], [:id, :subnet, :mask, :description]) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+      filter_hash(json_body, [:data, :error, :message])
     end
 
     def get_subnet_by_cidr(cidr)
-      response = get("subnets/cidr/#{cidr.to_s}")
+      response = get("subnets/cidr/#{cidr}")
+      return nil if response.code == 404
+
       json_body = JSON.parse(response.body)
-      return {}.to_json if json_body['data'].nil?
+      return nil if json_body['data'].nil?
+
       json_body['data'] = filter_fields(json_body, [:id, :subnet, :description, :mask])[0]
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+      filter_hash(json_body, [:data, :error, :message])
     end
 
     def get_section(section_name)

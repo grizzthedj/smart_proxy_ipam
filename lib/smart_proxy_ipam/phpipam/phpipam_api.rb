@@ -25,10 +25,9 @@ module Proxy::Phpipam
     get '/subnet/:address/:prefix/next_ip' do
       content_type :json
 
-      begin
-        err = validate_required_params(["address", "prefix", "mac"], params)
-        return err if err.length > 0
+      validate_required_params!([:address, :prefix, :mac], params)
 
+      begin
         mac = params[:mac]
         cidr = params[:address] + '/' + params[:prefix]
         section_name = params[:group]
@@ -77,10 +76,9 @@ module Proxy::Phpipam
     get '/subnet/:address/:prefix' do
       content_type :json
 
-      begin
-        err = validate_required_params(["address", "prefix"], params)
-        return err if err.length > 0
+      validate_required_params!([:address, :prefix], params)
 
+      begin
         cidr = params[:address] + '/' + params[:prefix]
 
         phpipam_client = PhpipamClient.new
@@ -138,10 +136,9 @@ module Proxy::Phpipam
     get '/groups/:group' do
       content_type :json
 
-      begin
-        err = validate_required_params(["group"], params)
-        return err if err.length > 0
+      validate_required_params!([:group], params)
 
+      begin
         phpipam_client = PhpipamClient.new
         return auth_error unless phpipam_client.authenticated?
 
@@ -213,10 +210,9 @@ module Proxy::Phpipam
     get '/groups/:group/subnets' do
       content_type :json
 
-      begin
-        err = validate_required_params(["group"], params)
-        return err if err.length > 0
+      validate_required_params!([:group], params)
 
+      begin
         phpipam_client = PhpipamClient.new
         return auth_error unless phpipam_client.authenticated?
 
@@ -246,10 +242,9 @@ module Proxy::Phpipam
     get '/subnet/:address/:prefix/:ip' do
       content_type :json
 
-      begin
-        err = validate_required_params(["address", "prefix", "ip"], params)
-        return err if err.length > 0
+      validate_required_params!([:address, :prefix, :ip], params)
 
+      begin
         ip = params[:ip]
         cidr = params[:address] + '/' + params[:prefix]
         section_name = params[:group]
@@ -291,10 +286,9 @@ module Proxy::Phpipam
     post '/subnet/:address/:prefix/:ip' do
       content_type :json
 
-      begin
-        err = validate_required_params(["address", "ip", "prefix"], params)
-        return err if err.length > 0
+      validate_required_params!([:address, :ip, :prefix], params)
 
+      begin
         ip = params[:ip]
         cidr = params[:address] + '/' + params[:prefix]
         section_name = URI.escape(params[:group])
@@ -334,10 +328,9 @@ module Proxy::Phpipam
     delete '/subnet/:address/:prefix/:ip' do
       content_type :json
 
-      begin
-        err = validate_required_params(["address", "prefix", "ip"], params)
-        return err if err.length > 0
+      validate_required_params!([:address, :prefix, :ip], params)
 
+      begin
         ip = params[:ip]
         cidr = params[:address] + '/' + params[:prefix]
         section_name = URI.escape(params[:group])
@@ -377,10 +370,9 @@ module Proxy::Phpipam
     get '/group/:group/subnet/:address/:prefix' do
       content_type :json
 
-      begin
-        err = validate_required_params(["address", "prefix", "group"], params)
-        return err if err.length > 0
+      validate_required_params!([:address, :prefix, :group], params)
 
+      begin
         cidr = params[:address] + '/' + params[:prefix]
 
         phpipam_client = PhpipamClient.new

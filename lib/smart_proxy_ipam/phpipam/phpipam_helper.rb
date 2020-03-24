@@ -1,12 +1,7 @@
 module PhpipamHelper
-  def validate_required_params(required_params, params)
-    err = []
-    required_params.each do |param|
-      if not params[param.to_sym]
-        err.push errors[param.to_sym]
-      end
-    end
-    err.length == 0 ? [] : {:code => 400, :error => err}.to_json
+  def validate_required_params!(required_params, params)
+    err = required_params.select { |param| params[param] }.map { |param| errors[param] }
+    log_halt 400, {error: err}.to_json unless err.emtpy?
   end
 
   def no_subnets_found?(subnet)

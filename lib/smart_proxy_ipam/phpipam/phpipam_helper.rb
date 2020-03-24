@@ -28,6 +28,16 @@ module PhpipamHelper
     {:code => 401, :error => "Invalid username and password for External IPAM"}.to_json
   end
 
+  def provider
+    @provider ||= begin
+                    phpipam_client = PhpipamClient.new
+                    unless phpipam_client.authenticated?
+                      log_halt 500, {error: 'Invalid username and password for External IPAM'}.to_json
+                    end
+                    phpipam_client
+                  end
+  end
+
   # Returns an array of hashes with only the fields given in the fields param
   def filter_fields(json_body, fields)
     data = []

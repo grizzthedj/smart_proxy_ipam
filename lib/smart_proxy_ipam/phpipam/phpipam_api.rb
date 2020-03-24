@@ -32,14 +32,11 @@ module Proxy::Phpipam
         cidr = params[:address] + '/' + params[:prefix]
         section_name = params[:group]
 
-        phpipam_client = PhpipamClient.new
-        return auth_error unless phpipam_client.authenticated?
-
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
+        subnet = JSON.parse(provider.get_subnet(cidr, section_name))
 
         return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
-        ipaddr = phpipam_client.get_next_ip(subnet['data']['id'], mac, cidr, section_name)
+        ipaddr = provider.get_next_ip(subnet['data']['id'], mac, cidr, section_name)
         ipaddr_parsed = JSON.parse(ipaddr)
 
         return {:error => ipaddr_parsed['error']}.to_json if no_free_ip_found?(ipaddr_parsed)
@@ -81,10 +78,7 @@ module Proxy::Phpipam
       begin
         cidr = params[:address] + '/' + params[:prefix]
 
-        phpipam_client = PhpipamClient.new
-        return auth_error unless phpipam_client.authenticated?
-
-        phpipam_client.get_subnet(cidr)
+        provider.get_subnet(cidr)
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise
@@ -107,10 +101,7 @@ module Proxy::Phpipam
       content_type :json
 
       begin
-        phpipam_client = PhpipamClient.new
-        return auth_error unless phpipam_client.authenticated?
-
-        sections = phpipam_client.get_sections
+        sections = provider.get_sections
         return {:data => []}.to_json if no_sections_found?(JSON.parse(sections))
 
         sections
@@ -139,10 +130,7 @@ module Proxy::Phpipam
       validate_required_params!([:group], params)
 
       begin
-        phpipam_client = PhpipamClient.new
-        return auth_error unless phpipam_client.authenticated?
-
-        section = JSON.parse(phpipam_client.get_section(params[:group]))
+        section = JSON.parse(provider.get_section(params[:group]))
         return {}.to_json if no_section_found?(section)
 
         section['data'].to_json
@@ -213,13 +201,10 @@ module Proxy::Phpipam
       validate_required_params!([:group], params)
 
       begin
-        phpipam_client = PhpipamClient.new
-        return auth_error unless phpipam_client.authenticated?
-
-        section = JSON.parse(phpipam_client.get_section(params[:group]))
+        section = JSON.parse(provider.get_section(params[:group]))
         return {:error => errors[:no_section]}.to_json if no_section_found?(section)
 
-        phpipam_client.get_subnets(section['data']['id'].to_s, false)
+        provider.get_subnets(section['data']['id'].to_s, false)
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise
@@ -249,13 +234,10 @@ module Proxy::Phpipam
         cidr = params[:address] + '/' + params[:prefix]
         section_name = params[:group]
 
-        phpipam_client = PhpipamClient.new
-        return auth_error unless phpipam_client.authenticated?
-
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
+        subnet = JSON.parse(provider.get_subnet(cidr, section_name))
         return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
-        response = phpipam_client.ip_exists(ip, subnet['data']['id'])
+        response = provider.ip_exists(ip, subnet['data']['id'])
         ip_exists = JSON.parse(response.body)
 
         if ip_exists['data']
@@ -293,13 +275,10 @@ module Proxy::Phpipam
         cidr = params[:address] + '/' + params[:prefix]
         section_name = URI.escape(params[:group])
 
-        phpipam_client = PhpipamClient.new
-        return auth_error unless phpipam_client.authenticated?
-
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
+        subnet = JSON.parse(provider.get_subnet(cidr, section_name))
         return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
-        response = phpipam_client.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
+        response = provider.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
         add_ip = JSON.parse(response.body)
 
         if add_ip['message'] && add_ip['message'] == "Address created"
@@ -334,13 +313,11 @@ module Proxy::Phpipam
         ip = params[:ip]
         cidr = params[:address] + '/' + params[:prefix]
         section_name = URI.escape(params[:group])
-        phpipam_client = PhpipamClient.new
-        return auth_error unless phpipam_client.authenticated?
 
-        subnet = JSON.parse(phpipam_client.get_subnet(cidr, section_name))
+        subnet = JSON.parse(provider.get_subnet(cidr, section_name))
         return {:error => subnet['error']}.to_json if no_subnets_found?(subnet)
 
-        response = phpipam_client.delete_ip_from_subnet(ip, subnet['data']['id'])
+        response = provider.delete_ip_from_subnet(ip, subnet['data']['id'])
         delete_ip = JSON.parse(response.body)
 
         if delete_ip['message'] && delete_ip['message'] == "Address deleted"
@@ -375,10 +352,7 @@ module Proxy::Phpipam
       begin
         cidr = params[:address] + '/' + params[:prefix]
 
-        phpipam_client = PhpipamClient.new
-        return auth_error unless phpipam_client.authenticated?
-
-        phpipam_client.get_subnet_by_section(cidr, params[:group])
+        provider.get_subnet_by_section(cidr, params[:group])
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise

@@ -38,11 +38,10 @@ module Proxy::Phpipam
     end
 
     def get_subnet_by_section(cidr, section_name, include_id = true)
-      section = JSON.parse(get_section(section_name))
+      section = get_section(section_name)
+      return {:error => "No section #{section_name} found"}.to_json unless section
 
-      return {:error => "No section #{section_name} found"}.to_json if no_section_found?(section)
-
-      subnets = JSON.parse(get_subnets(section['data']['id'], include_id))
+      subnets = JSON.parse(get_subnets(section['id'], include_id))
       subnet_id = nil
 
       subnets['data'].each do |subnet|
@@ -74,12 +73,15 @@ module Proxy::Phpipam
 
     def get_section(section_name)
       response = get("sections/#{URI.escape(section_name)}/")
+      # TODO: check for non-200 codes
+      return nil if response.code == 404
+
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_hash(json_body['data'], [:id, :name, :description]) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+      # TODO is this redundant and is the HTTP 404 code reliable?
+      return nil if section['message'] && section['message'].downcase == "not found"
+      return nil unless json_body['data']
+
+      filter_hash(json_body['data'], [:id, :name, :description])
     end
 
     def get_sections

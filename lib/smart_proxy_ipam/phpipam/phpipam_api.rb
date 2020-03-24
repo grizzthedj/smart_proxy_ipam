@@ -128,10 +128,9 @@ module Proxy::Phpipam
       validate_required_params!([:group], params)
 
       begin
-        section = JSON.parse(provider.get_section(params[:group]))
-        return {}.to_json if no_section_found?(section)
-
-        section['data'].to_json
+        section = provider.get_section(params[:group])
+        status 404 unless section
+        section.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise
@@ -199,10 +198,10 @@ module Proxy::Phpipam
       validate_required_params!([:group], params)
 
       begin
-        section = JSON.parse(provider.get_section(params[:group]))
-        return {:error => errors[:no_section]}.to_json if no_section_found?(section)
+        section = provider.get_section(params[:group])
+        return {:error => errors[:no_section]}.to_json unless section
 
-        provider.get_subnets(section['data']['id'].to_s, false)
+        provider.get_subnets(section['id'].to_s, false)
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise

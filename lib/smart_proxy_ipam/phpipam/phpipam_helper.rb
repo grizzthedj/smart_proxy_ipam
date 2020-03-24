@@ -4,6 +4,22 @@ module PhpipamHelper
     log_halt 400, {error: err}.to_json unless err.emtpy?
   end
 
+  def validate_ip!(ip)
+    IPAddr.new(ip).to_s
+  rescue IPAddr::InvalidAddressError => e
+    log_halt 400, {error: e.to_s}.to_json
+  end
+
+  def validate_cidr!(address, prefix)
+    cidr = "#{address}/#{prefix}"
+    if IPAddr.new(cidr).to_s != IPAddr.new(address).to_s
+      log_halt 400, {error: "Network address #{address} should be #{network} with prefix #{prefix}"}.to_json
+    end
+    cidr
+  rescue IPAddr::Error => e
+    log_halt 400, {error: e.to_s}.to_json
+  end
+
   def check_subnet_exists!(subnet)
     if subnet['error'] && subnet['error'].downcase == "no subnets found"
       log_halt 404, {error: 'No subnet found'}.to_json

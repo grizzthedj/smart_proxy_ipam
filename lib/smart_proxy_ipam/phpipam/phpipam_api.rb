@@ -26,10 +26,10 @@ module Proxy::Phpipam
       content_type :json
 
       validate_required_params!([:address, :prefix, :mac], params)
+      cidr = validate_cidr!(params[:address], params[:prefix])
 
       begin
         mac = params[:mac]
-        cidr = params[:address] + '/' + params[:prefix]
         section_name = params[:group]
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
@@ -73,10 +73,9 @@ module Proxy::Phpipam
       content_type :json
 
       validate_required_params!([:address, :prefix], params)
+      cidr = validate_cidr!(params[:address], params[:prefix])
 
       begin
-        cidr = params[:address] + '/' + params[:prefix]
-
         provider.get_subnet(cidr)
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
@@ -227,10 +226,10 @@ module Proxy::Phpipam
       content_type :json
 
       validate_required_params!([:address, :prefix, :ip], params)
+      ip = validate_ip!(params[:ip])
+      cidr = validate_cidr!(params[:address], params[:prefix])
 
       begin
-        ip = params[:ip]
-        cidr = params[:address] + '/' + params[:prefix]
         section_name = params[:group]
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
@@ -268,10 +267,10 @@ module Proxy::Phpipam
       content_type :json
 
       validate_required_params!([:address, :ip, :prefix], params)
+      ip = validate_ip!(params[:ip])
+      cidr = validate_cidr!(params[:address], params[:prefix])
 
       begin
-        ip = params[:ip]
-        cidr = params[:address] + '/' + params[:prefix]
         section_name = URI.escape(params[:group])
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
@@ -308,10 +307,10 @@ module Proxy::Phpipam
       content_type :json
 
       validate_required_params!([:address, :prefix, :ip], params)
+      ip = validate_ip!(params[:ip])
+      cidr = validate_cidr!(params[:address], params[:prefix])
 
       begin
-        ip = params[:ip]
-        cidr = params[:address] + '/' + params[:prefix]
         section_name = URI.escape(params[:group])
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
@@ -350,10 +349,9 @@ module Proxy::Phpipam
       content_type :json
 
       validate_required_params!([:address, :prefix, :group], params)
+      cidr = validate_cidr!(params[:address], params[:prefix])
 
       begin
-        cidr = params[:address] + '/' + params[:prefix]
-
         provider.get_subnet_by_section(cidr, params[:group])
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])

@@ -239,11 +239,11 @@ module Proxy::Phpipam
         response = provider.ip_exists(ip, subnet['data']['id'])
         ip_exists = JSON.parse(response.body)
 
-        if ip_exists['data']
-          return Net::HTTPFound.new('HTTP/1.1', 200, 'Found').to_json
-        else
-          return Net::HTTPNotFound.new('HTTP/1.1', 404, 'Not Found').to_json
+        unless ip_exists['data']
+          log_halt 404, {error: "IP #{ip} was not found in subnet #{cidr}"}.to_json
         end
+
+        {ip: ip}
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise
@@ -280,11 +280,12 @@ module Proxy::Phpipam
         response = provider.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
         add_ip = JSON.parse(response.body)
 
-        if add_ip['message'] && add_ip['message'] == "Address created"
-          return Net::HTTPCreated.new('HTTP/1.1', 201, 'Created').to_json
-        else
-          return {:error => add_ip['message']}.to_json
+        unless add_ip['message'] && add_ip['message'] == "Address created"
+          log_halt 500, {error: add_ip['message']}.to_json
         end
+
+        status 201
+        {ip: ip}.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise
@@ -300,7 +301,7 @@ module Proxy::Phpipam
     # Returns: JSON object
     # Example:
     #   Response if success:
-    #     {"code": 200, "success": true, "message": "Address deleted", "time": 0.017}
+    #     HTTP 204 No Content
     #   Response if :error =>
     #     {"code": 404, "success": 0, "message": "Address does not exist", "time": 0.008}
     delete '/subnet/:address/:prefix/:ip' do
@@ -319,11 +320,13 @@ module Proxy::Phpipam
         response = provider.delete_ip_from_subnet(ip, subnet['data']['id'])
         delete_ip = JSON.parse(response.body)
 
-        if delete_ip['message'] && delete_ip['message'] == "Address deleted"
-          return Net::HTTPOK.new('HTTP/1.1', 200, 'Address Deleted').to_json
-        else
-          return {:error => delete_ip['message']}.to_json
+        unless delete_ip['message'] && delete_ip['message'] == "Address deleted"
+          # TODO: this can be anything, also address didn't exist
+          log_halt 500, {error: delete_ip['message']}.to_json
         end
+
+        status 204
+        nil
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise

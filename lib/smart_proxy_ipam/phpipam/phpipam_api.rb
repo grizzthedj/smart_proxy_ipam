@@ -313,20 +313,15 @@ module Proxy::Phpipam
         subnet = provider.get_subnet(cidr, section_name)
         check_subnet_exists!(subnet)
 
-        response = provider.delete_ip_from_subnet(ip, subnet['data']['id'])
-        delete_ip = JSON.parse(response.body)
-
-        unless delete_ip['message'] && delete_ip['message'] == "Address deleted"
-          # TODO: this can be anything, also address didn't exist
-          halt 500, {error: delete_ip['message']}.to_json
-        end
-
-        status 204
-        nil
+        delete_ip = provider.delete_ip_from_subnet(ip, subnet['data']['id'])
+        halt 500, delete_ip.to_json if delete_ip
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise
       end
+
+      status 204
+      nil
     end
 
     # Checks whether a subnet exists in a specific section.

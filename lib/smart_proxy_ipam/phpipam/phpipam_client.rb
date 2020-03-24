@@ -122,12 +122,11 @@ module Proxy::Phpipam
     end
 
     def delete_ip_from_subnet(ip, subnet_id)
-      response = delete("addresses/#{ip}/#{subnet_id.to_s}/")
+      response = delete("addresses/#{ip}/#{subnet_id}/")
       json_body = JSON.parse(response.body)
-      json_body = filter_hash(json_body, [:error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response
+      return nil if delete_ip['message'] && delete_ip['message'] == "Address deleted"
+
+      filter_hash(json_body, [:error, :message])
     end
 
     def get_next_ip(subnet_id, mac, cidr, section_name)

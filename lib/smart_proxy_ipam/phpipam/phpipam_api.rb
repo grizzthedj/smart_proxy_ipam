@@ -272,19 +272,15 @@ module Proxy::Phpipam
         subnet = provider.get_subnet(cidr, section_name)
         check_subnet_exists!(subnet)
 
-        response = provider.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
-        add_ip = JSON.parse(response.body)
-
-        unless add_ip['message'] && add_ip['message'] == "Address created"
-          halt 500, {error: add_ip['message']}.to_json
-        end
-
-        status 201
-        {ip: ip}.to_json
+        add_ip = provider.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
+        halt 500, add_ip.to_json if add_ip
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise
       end
+
+      status 201
+      {ip: ip}.to_json
     end
 
     # Deletes IP address from a given subnet

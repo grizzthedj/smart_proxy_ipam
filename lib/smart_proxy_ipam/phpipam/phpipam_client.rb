@@ -115,10 +115,9 @@ module Proxy::Phpipam
       data = {:subnetId => subnet_id, :ip => ip, :description => desc}
       response = post('addresses/', data)
       json_body = JSON.parse(response.body)
-      json_body = filter_hash(json_body, [:error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response
+      return nil if add_ip['message'] && add_ip['message'] == "Address created"
+
+      filter_hash(json_body, [:error, :message])
     end
 
     def delete_ip_from_subnet(ip, subnet_id)

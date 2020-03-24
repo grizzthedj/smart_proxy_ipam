@@ -138,7 +138,7 @@ module Proxy::Phpipam
       @@ip_cache[section.to_sym] = {} if @@ip_cache[section.to_sym].nil?
       subnet_hash = @@ip_cache[section.to_sym][cidr.to_sym]
 
-      return {:error => json_body['message']}.to_json if json_body['message']
+      return {:error => json_body['message']} if json_body['message']
 
       if subnet_hash && subnet_hash.key?(mac.to_sym)
         json_body['data'] = @@ip_cache[section_name.to_sym][cidr.to_sym][mac.to_sym][:ip]
@@ -154,17 +154,18 @@ module Proxy::Phpipam
           next_ip = find_new_ip(subnet_id, new_ip, mac, cidr, section)
         end
 
-        return {:error => "Unable to find another available IP address in subnet #{cidr}"}.to_json if next_ip.nil?
-        return {:error => "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{DEFAULT_CLEANUP_INTERVAL} seconds)."}.to_json unless usable_ip(next_ip, cidr)
+        return {:error => "Unable to find another available IP address in subnet #{cidr}"} if next_ip.nil?
+        return {:error => "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{DEFAULT_CLEANUP_INTERVAL} seconds)."} unless usable_ip(next_ip, cidr)
 
         json_body['data'] = next_ip
       end
 
-      json_body = {:data => json_body['data']}
+      # TODO: Is there a better way to catch this?
+      if json_body['error'] && json_body['error'].downcase == "no free addresses found"
+        return {:error => json_body['error']}
+      end
 
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+      {:data => json_body['data']}
     end
 
     def start_cleanup_task

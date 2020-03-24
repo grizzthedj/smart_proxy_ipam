@@ -36,10 +36,6 @@ module PhpipamHelper
     subnet['error'] && subnet['error'].downcase == "no subnets found"
   end
 
-  def no_free_ip_found?(ip)
-    ip['error'] && ip['error'].downcase == "no free addresses found"
-  end
-
   def ip_not_found_in_ipam?(ip)
     ip && ip['message'] && ip['message'].downcase == 'no addresses found'
   end

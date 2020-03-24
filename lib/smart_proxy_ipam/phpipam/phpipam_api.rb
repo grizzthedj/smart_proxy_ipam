@@ -35,12 +35,7 @@ module Proxy::Phpipam
         subnet = provider.get_subnet(cidr, section_name)
         check_subnet_exists!(subnet)
 
-        ipaddr = provider.get_next_ip(subnet['data']['id'], mac, cidr, section_name)
-        ipaddr_parsed = JSON.parse(ipaddr)
-
-        return {:error => ipaddr_parsed['error']}.to_json if no_free_ip_found?(ipaddr_parsed)
-
-        ipaddr
+        provider.get_next_ip(subnet['data']['id'], mac, cidr, section_name).to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
         logger.debug(errors[:no_connection])
         raise

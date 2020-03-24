@@ -273,7 +273,7 @@ module Proxy::Phpipam
       validate_ip_in_cidr!(ip, cidr)
 
       begin
-        section_name = URI.escape(params[:group])
+        section_name = params[:group]
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
         check_subnet_exists!(subnet)
@@ -314,7 +314,7 @@ module Proxy::Phpipam
       validate_ip_in_cidr!(ip, cidr)
 
       begin
-        section_name = URI.escape(params[:group])
+        section_name = params[:group]
 
         subnet = JSON.parse(provider.get_subnet(cidr, section_name))
         check_subnet_exists!(subnet)

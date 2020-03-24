@@ -40,7 +40,7 @@ module Proxy::Phpipam
     def get_subnet_by_section(cidr, section_name, include_id = true)
       section = JSON.parse(get_section(section_name))
 
-      return {:error => "No section #{URI.unescape(section_name)} found"}.to_json if no_section_found?(section)
+      return {:error => "No section #{section_name} found"}.to_json if no_section_found?(section)
 
       subnets = JSON.parse(get_subnets(section['data']['id'], include_id))
       subnet_id = nil
@@ -73,7 +73,7 @@ module Proxy::Phpipam
     end
 
     def get_section(section_name)
-      response = get("sections/#{section_name}/")
+      response = get("sections/#{URI.escape(section_name)}/")
       json_body = JSON.parse(response.body)
       json_body['data'] = filter_hash(json_body['data'], [:id, :name, :description]) if json_body['data']
       json_body = filter_hash(json_body, [:data, :error, :message])

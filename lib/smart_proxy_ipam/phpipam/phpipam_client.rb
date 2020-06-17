@@ -1,5 +1,5 @@
 require 'yaml'
-require 'json' 
+require 'json'
 require 'net/http'
 require 'monitor'
 require 'concurrent'
@@ -19,7 +19,7 @@ module Proxy::Phpipam
     @@ip_cache = nil
     @@timer_task = nil
 
-    def initialize 
+    def initialize
       @conf = Proxy::Ipam.get_config[:phpipam]
       @api_base = "#{@conf[:url]}/api/#{@conf[:user]}/"
       @token = nil
@@ -49,7 +49,7 @@ module Proxy::Phpipam
         subnet_cidr = subnet['subnet'] + '/' + subnet['mask']
         subnet_id = subnet['id'] if subnet_cidr == cidr
       end
-      
+
       return {}.to_json if subnet_id.nil?
 
       response = get("subnets/#{subnet_id.to_s}/")
@@ -125,7 +125,7 @@ module Proxy::Phpipam
     end
 
     def delete_ip_from_subnet(ip, subnet_id)
-      response = delete("addresses/#{ip}/#{subnet_id.to_s}/") 
+      response = delete("addresses/#{ip}/#{subnet_id.to_s}/")
       json_body = JSON.parse(response.body)
       json_body = filter_hash(json_body, [:error, :message])
       response.body = json_body.to_json
@@ -182,30 +182,30 @@ module Proxy::Phpipam
     private
 
     # @@ip_cache structure
-    # 
+    #
     # Groups of subnets are cached under the External IPAM Group name. For example,
     # "IPAM Group Name" would be the section name in phpIPAM. All IP's cached for subnets
-    # that do not have an External IPAM group specified, they are cached under the "" key. IP's 
-    # are cached using one of two possible keys: 
+    # that do not have an External IPAM group specified, they are cached under the "" key. IP's
+    # are cached using one of two possible keys:
     #    1). Mac Address
     #    2). UUID (Used when Mac Address not specified)
     #
-    # {  
+    # {
     #   "": {
-    #     "100.55.55.0/24":{  
+    #     "100.55.55.0/24":{
     #       "00:0a:95:9d:68:10": {"ip": "100.55.55.1", "timestamp": "2019-09-17 12:03:43 -D400"},
     #       "906d8bdc-dcc0-4b59-92cb-665935e21662": {"ip": "100.55.55.2", "timestamp": "2019-09-17 11:43:22 -D400"}
     #     },
     #   },
     #   "IPAM Group Name": {
-    #     "123.11.33.0/24":{  
+    #     "123.11.33.0/24":{
     #       "00:0a:95:9d:68:33": {"ip": "123.11.33.1", "timestamp": "2019-09-17 12:04:43 -0400"},
     #       "00:0a:95:9d:68:34": {"ip": "123.11.33.2", "timestamp": "2019-09-17 12:05:48 -0400"},
     #       "00:0a:95:9d:68:35": {"ip": "123.11.33.3", "timestamp:: "2019-09-17 12:06:50 -0400"}
     #     }
     #   },
     #   "Another IPAM Group": {
-    #     "185.45.39.0/24":{  
+    #     "185.45.39.0/24":{
     #       "00:0a:95:9d:68:55": {"ip": "185.45.39.1", "timestamp": "2019-09-17 12:04:43 -0400"},
     #       "00:0a:95:9d:68:56": {"ip": "185.45.39.2", "timestamp": "2019-09-17 12:05:48 -0400"}
     #     }
@@ -235,7 +235,7 @@ module Proxy::Phpipam
     def add_ip_to_cache(ip, mac, cidr, section_name)
       logger.debug("Adding IP #{ip} to cache for subnet #{cidr} in section #{section_name}")
       @@m.synchronize do
-        # Clear cache data which has the same mac and ip with the new one 
+        # Clear cache data which has the same mac and ip with the new one
 
         mac_addr = (mac.nil? || mac.empty?) ? SecureRandom.uuid : mac
         section_hash = @@ip_cache[section_name.to_sym]
@@ -245,8 +245,8 @@ module Proxy::Phpipam
             @@ip_cache[section_name.to_sym][key].delete(mac_addr.to_sym)
           end
           @@ip_cache[section_name.to_sym].delete(key) if @@ip_cache[section_name.to_sym][key].nil? or @@ip_cache[section_name.to_sym][key].empty?
-        end   
-      
+        end
+
         if section_hash.key?(cidr.to_sym)
           @@ip_cache[section_name.to_sym][cidr.to_sym][mac_addr.to_sym] = {:ip => ip.to_s, :timestamp => Time.now.to_s}
         else
@@ -255,8 +255,8 @@ module Proxy::Phpipam
       end
     end
 
-    # Called when next available IP from external IPAM has been cached by another user/host, but 
-    # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and 
+    # Called when next available IP from external IPAM has been cached by another user/host, but
+    # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and
     # see if it is available in external IPAM.
     def find_new_ip(subnet_id, ip, mac, cidr, section_name)
       found_ip = nil
@@ -290,7 +290,7 @@ module Proxy::Phpipam
     end
 
     def ip_exists_in_cache(ip, cidr, mac, section_name)
-      @@ip_cache[section_name.to_sym][cidr.to_sym] && @@ip_cache[section_name.to_sym][cidr.to_sym].to_s.include?(ip.to_s)      
+      @@ip_cache[section_name.to_sym][cidr.to_sym] && @@ip_cache[section_name.to_sym][cidr.to_sym].to_s.include?(ip.to_s)
     end
 
     # Checks if given IP is within a subnet. Broadcast address is considered unusable
@@ -304,7 +304,7 @@ module Proxy::Phpipam
       request = Net::HTTP::Get.new(uri)
       request['token'] = @token
 
-      Net::HTTP.start(uri.hostname, uri.port) {|http|
+      Net::HTTP.start(uri.hostname, uri.port, :use_ssl => uri.scheme == 'https') {|http|
         http.request(request)
       }
     end
@@ -315,7 +315,7 @@ module Proxy::Phpipam
       request = Net::HTTP::Delete.new(uri)
       request['token'] = @token
 
-      Net::HTTP.start(uri.hostname, uri.port) {|http|
+      Net::HTTP.start(uri.hostname, uri.port, :use_ssl => uri.scheme == 'https') {|http|
         http.request(request)
       }
     end
@@ -326,7 +326,7 @@ module Proxy::Phpipam
       request = Net::HTTP::Post.new(uri)
       request['token'] = @token
 
-      Net::HTTP.start(uri.hostname, uri.port) {|http|
+      Net::HTTP.start(uri.hostname, uri.port, :use_ssl => uri.scheme == 'https') {|http|
         http.request(request)
       }
     end
@@ -336,13 +336,13 @@ module Proxy::Phpipam
       request = Net::HTTP::Post.new(auth_uri)
       request.basic_auth @conf[:user], @conf[:password]
 
-      response = Net::HTTP.start(auth_uri.hostname, auth_uri.port) {|http|
+      response = Net::HTTP.start(auth_uri.hostname, auth_uri.port, :use_ssl => auth_uri.scheme == 'https') {|http|
         http.request(request)
       }
 
       response = JSON.parse(response.body)
       logger.warn(response['message']) if response['message']
       @token = response.dig('data', 'token')
-    end    
+    end
   end
 end

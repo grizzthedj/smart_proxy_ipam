@@ -29,7 +29,7 @@ GEM
     multi_json (1.13.1)
     mustermann (1.0.3)
     power_assert (1.1.4)
-    rack (2.0.8)
+    rack (2.2.3)
     rack-protection (2.0.5)
       rack
     rack-test (1.1.0)

@@ -18,7 +18,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     concurrent-ruby (1.1.5)
-    json (2.2.0)
+    json (2.3.1)
     little-plugger (1.1.4)
     logging (2.2.2)
       little-plugger (~> 1.1)

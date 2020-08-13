@@ -43,18 +43,17 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        validate_required_params!([:provider, :address, :prefix, :mac], params)
+        validate_presence_of!([:provider, :address, :prefix, :mac], params)
 
+        mac = request_mac(params)
+        cidr = request_cidr(params)
         provider = provider_instance(params[:provider])
-        mac = validate_mac!(params[:mac])
-        cidr = validate_cidr!(params[:address], params[:prefix])
-        group_name = params[:group]
+        group_name = request_group(params, provider)
         subnet = get_subnet(provider, group_name, cidr)
 
         halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
         next_ip = provider.get_next_ip(subnet[:data][:id], mac, cidr, group_name)
         halt 404, { error: errors[:no_free_ips] }.to_json if provider.no_free_ip_found?(next_ip)
-
         next_ip.to_json
       rescue RuntimeError => e
         logger.warn(e.message)
@@ -93,15 +92,14 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        validate_required_params!([:provider, :address, :prefix], params)
+        validate_presence_of!([:provider, :address, :prefix], params)
 
+        cidr = request_cidr(params)
         provider = provider_instance(params[:provider])
-        group_name = URI.escape(params[:group]) if params[:group]
-        cidr = validate_cidr!(params[:address], params[:prefix])
-
+        group_name = request_group(params, provider)
         subnet = get_subnet(provider, group_name, cidr)
-        halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
 
+        halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
         subnet.to_json
       rescue RuntimeError => e
         logger.warn(e.message)
@@ -130,7 +128,7 @@ module Proxy::Ipam
     #   ===========================
     #     Http Code:     404
     #     JSON Response:
-    #       {"data": []}
+    #       {"error": "Groups are not supported"}
     #
     #   Response if groups are not supported:
     #   ===========================
@@ -141,13 +139,12 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        validate_required_params!([:provider], params)
+        validate_presence_of!([:provider], params)
 
         provider = provider_instance(params[:provider])
         halt 500, { error: errors[:groups_not_supported] }.to_json unless provider.groups_supported?
         groups = provider.get_groups
-        return { data: [] }.to_json if provider.no_groups_found?(groups)
-
+        halt 404, { error: errors[:no_groups] }.to_json if provider.no_groups_found?(groups)
         groups.to_json
       rescue RuntimeError => e
         logger.warn(e.message)
@@ -185,14 +182,13 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        validate_required_params!([:provider, :group], params)
+        validate_presence_of!([:provider, :group], params)
 
         provider = provider_instance(params[:provider])
-        group = provider.get_group(params[:group])
+        group_name = request_group(params, provider)
+        group = provider.get_group(group_name)
 
-        halt 500, { error: errors[:groups_not_supported] }.to_json unless provider.groups_supported?
         halt 404, { error: errors[:no_group] }.to_json unless provider.group_exists?(group)
-
         group.to_json
       rescue RuntimeError => e
         logger.warn(e.message)
@@ -233,16 +229,15 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        validate_required_params!([:provider, :group], params)
+        validate_presence_of!([:provider, :group], params)
 
         provider = provider_instance(params[:provider])
+        group_name = request_group(params, provider)
+        group = provider.get_group(group_name)
 
-        halt 500, { error: errors[:groups_not_supported] }.to_json unless provider.groups_supported?
-        group = provider.get_group(params[:group])
         halt 404, { error: errors[:no_group] }.to_json unless provider.group_exists?(group)
         subnets = provider.get_subnets(group[:data][:id].to_s, false)
         halt 404, { error: errors[:no_subnets_in_group] }.to_json if provider.no_subnets_found?(subnets)
-
         subnets.to_json
       rescue RuntimeError => e
         logger.warn(e.message)
@@ -276,20 +271,18 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        validate_required_params!([:provider, :address, :prefix, :ip], params)
+        validate_presence_of!([:provider, :address, :prefix, :ip], params)
 
-        ip = validate_ip!(params[:ip])
-        cidr = validate_cidr!(params[:address], params[:prefix])
+        ip = request_ip(params)
+        cidr = request_cidr(params)
         validate_ip_in_cidr!(ip, cidr)
-        group_name = URI.escape(params[:group]) if params[:group]
         provider = provider_instance(params[:provider])
-
-        halt 500, { error: errors[:groups_not_supported] }.to_json unless provider.groups_supported?
+        group_name = request_group(params, provider)
         subnet = get_subnet(provider, group_name, cidr)
+
         halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
         ip_exists = provider.ip_exists?(ip, subnet[:data][:id])
         halt 404, { error: errors[:no_ip] }.to_json unless ip_exists
-
         halt 200
       rescue RuntimeError => e
         logger.warn(e.message)
@@ -323,19 +316,18 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        validate_required_params!([:provider, :address, :ip, :prefix], params)
+        validate_presence_of!([:provider, :address, :ip, :prefix], params)
 
-        ip = validate_ip!(params[:ip])
-        cidr = validate_cidr!(params[:address], params[:prefix])
+        ip = request_ip(params)
+        cidr = request_cidr(params)
         validate_ip_in_cidr!(ip, cidr)
-        group_name = URI.escape(params[:group]) if params[:group]
         provider = provider_instance(params[:provider])
+        group_name = request_group(params, provider)
         subnet = get_subnet(provider, group_name, cidr)
 
         halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
         ip_added = provider.add_ip_to_subnet(ip, subnet[:data][:id], 'Address auto added by Foreman')
         halt 500, ip_added.to_json unless ip_added.nil?
-
         halt 201
       rescue RuntimeError => e
         logger.warn(e.message)
@@ -369,10 +361,10 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        validate_required_params!([:provider, :address, :ip, :prefix], params)
+        validate_presence_of!([:provider, :address, :ip, :prefix], params)
 
-        ip = validate_ip!(params[:ip])
-        cidr = validate_cidr!(params[:address], params[:prefix])
+        ip = request_ip(params)
+        cidr = request_cidr(params)
         validate_ip_in_cidr!(ip, cidr)
         group_name = URI.escape(params[:group]) if params[:group]
         provider = provider_instance(params[:provider])
@@ -381,7 +373,6 @@ module Proxy::Ipam
         halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
         ip_deleted = provider.delete_ip_from_subnet(ip, subnet[:data][:id])
         halt 500, ip_deleted.to_json unless ip_deleted.nil?
-
         halt 200
       rescue RuntimeError => e
         logger.warn(e.message)

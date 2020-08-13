@@ -22,12 +22,13 @@ module Proxy::Ipam
     MAX_RETRIES = 5
 
     def initialize
-      config = Proxy::Ipam.get_config[:phpipam]
+      provider = :phpipam
+      config = Proxy::Ipam.get_config[provider]
       raise 'The configuration for phpipam is not present in externalipam.yml' unless config
       api_base = "#{config[:url]}/api/#{config[:user]}/"
       @api_resource = ApiResource.new(api_base: api_base, config: config)
-      @api_resource.authenticate('/user/')
-      @ip_cache = IpCache.new
+      @api_resource.authenticate('/user/') 
+      @ip_cache = IpCache.new(provider: provider)
     end
 
     def get_subnet(cidr, group_id = nil)

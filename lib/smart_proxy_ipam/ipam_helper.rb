@@ -13,18 +13,14 @@ module IpamHelper
     when 'netbox'
       client = Proxy::Ipam::NetboxClient.allocate
     else
-      # Set to phpIPAM as a default, not to break existing implementations. After some
-      # time, raise an exception for unknown provider
+      # Setting phpIPAM as default provider, when provider not specified, not to break existing implementations
       client = Proxy::Ipam::PhpipamClient.allocate
-      # halt 500, {error: 'Unknown IPAM provider'}.to_json
+      # After some time, raise an exception for unknown provider
+      # halt 500, { error: 'Unknown IPAM provider' }.to_json
     end
 
     client.send :initialize
-
-    unless client.authenticated?
-      halt 500, { error: 'Invalid username and password for External IPAM' }.to_json
-    end
-
+    halt 500, { error: 'Invalid credentials for External IPAM' }.to_json unless client.authenticated?
     client
   end
 
@@ -51,7 +47,7 @@ module IpamHelper
     network.include?(IPAddr.new(ip)) && network.to_range.last != ip
   end
 
-  def validate_required_params!(required_params, params)
+  def validate_presence_of!(required_params, params)
     err = []
     required_params.each do |param|
       unless params[param.to_sym]
@@ -63,21 +59,17 @@ module IpamHelper
 
   def validate_ip!(ip)
     IPAddr.new(ip).to_s
-  rescue IPAddr::InvalidAddressError => e
-    halt 400, { error: e.to_s }.to_json
+  rescue IPAddr::InvalidAddressError
+    return nil
   end
 
   def validate_cidr!(address, prefix)
     cidr = "#{address}/#{prefix}"
     network = IPAddr.new(cidr).to_s
-
-    if network != IPAddr.new(address).to_s
-      halt 400, { error: "Network address #{address} should be #{network} with prefix #{prefix}" }.to_json
-    end
-
+    return nil if network != IPAddr.new(address).to_s
     cidr
   rescue IPAddr::Error => e
-    halt 400, { error: e.to_s }.to_json
+    return nil
   end
 
   def validate_ip_in_cidr!(ip, cidr)
@@ -86,9 +78,33 @@ module IpamHelper
 
   def validate_mac!(mac)
     unless mac.match(/^([0-9a-fA-F]{2}[:]){5}[0-9a-fA-F]{2}$/i)
-      halt 400, { error: 'MAC address format is invalid' }.to_json
+      return nil
     end
     mac
+  end
+
+  def request_ip(params)
+    ip = validate_ip!(params[:ip])
+    halt 400, { error: errors[:bad_ip] }.to_json if ip.nil?
+    ip
+  end
+
+  def request_cidr(params)
+    cidr = validate_cidr!(params[:address], params[:prefix])
+    halt 400, { error: errors[:bad_cidr] }.to_json if cidr.nil?
+    cidr
+  end
+
+  def request_mac(params)
+    mac = validate_mac!(params[:mac])
+    halt 400, { error: errors[:bad_mac] }.to_json if mac.nil?
+    mac
+  end
+
+  def request_group(params, provider)
+    group = params[:group] ? URI.escape(params[:group]) : nil
+    halt 500, { error: errors[:groups_not_supported] }.to_json if !provider.groups_supported? && group
+    group
   end
 
   def errors
@@ -101,11 +117,15 @@ module IpamHelper
       no_free_ips: 'No free addresses found',
       no_connection: 'Unable to connect to External IPAM server',
       no_group: 'Group not found in External IPAM',
+      no_groups: 'No groups found in External IPAM',
       no_subnet: 'Subnet not found in External IPAM',
       no_subnets_in_group: 'No subnets found in External IPAM group',
       provider: "The IPAM provider must be specified(e.g. 'phpipam' or 'netbox')",
       groups_not_supported: 'Groups are not supported',
-      add_ip: 'Error adding IP to External IPAM'
+      add_ip: 'Error adding IP to External IPAM',
+      bad_mac: 'The format of the mac address is invalid',
+      bad_ip: 'The format of the ip address is invalid',
+      bad_cidr: 'The format of the network cidr is invalid'
     }
   end
 end

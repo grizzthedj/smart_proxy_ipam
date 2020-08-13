@@ -5,145 +5,160 @@ require 'monitor'
 require 'concurrent'
 require 'time'
 require 'uri'
+require 'sinatra'
 require 'smart_proxy_ipam/ipam'
 require 'smart_proxy_ipam/ipam_main'
-require 'smart_proxy_ipam/phpipam/phpipam_helper'
+require 'smart_proxy_ipam/ipam_helper'
+require 'smart_proxy_ipam/api_resource'
+require 'smart_proxy_ipam/ip_cache'
 
-module Proxy::Phpipam
+module Proxy::Ipam
   class PhpipamClient
     include Proxy::Log
-    include PhpipamHelper
+    include IpamHelper
 
+    @ip_cache = nil
     MAX_RETRIES = 5
-    DEFAULT_CLEANUP_INTERVAL = 60  # 2 mins
-    @@ip_cache = nil
-    @@timer_task = nil
 
     def initialize
-      @conf = Proxy::Ipam.get_config[:phpipam]
-      @api_base = "#{@conf[:url]}/api/#{@conf[:user]}/"
-      @token = nil
-      @@m = Monitor.new
-      init_cache if @@ip_cache.nil?
-      start_cleanup_task if @@timer_task.nil?
-      authenticate
+      config = Proxy::Ipam.get_config[:phpipam]
+      raise "The configuration for phpipam is not present in externalipam.yml" unless config
+      api_base = "#{config[:url]}/api/#{config[:user]}/"
+      @api_resource = ApiResource.new(:api_base => api_base, :config => config)
+      @api_resource.authenticate('/user/')
+      @ip_cache = IpCache.new
     end
 
-    def get_subnet(cidr, section_name = nil)
-      if section_name.nil? || section_name.empty?
+    def get_subnet(cidr, group_id = nil)
+      if group_id.nil? || group_id.empty?
         get_subnet_by_cidr(cidr)
       else
-        get_subnet_by_section(cidr, section_name)
+        get_subnet_by_group(cidr, group_id)
       end
     end
 
-    def get_subnet_by_section(cidr, section_name, include_id = true)
-      section = JSON.parse(get_section(section_name))
-
-      return {:error => "No section #{URI.unescape(section_name)} found"}.to_json if no_section_found?(section)
-
-      subnets = JSON.parse(get_subnets(section['data']['id'], include_id))
+    def get_subnet_by_group(cidr, group_id, include_id = true)
+      subnets = get_subnets(group_id, include_id)
       subnet_id = nil
 
-      subnets['data'].each do |subnet|
-        subnet_cidr = subnet['subnet'] + '/' + subnet['mask']
-        subnet_id = subnet['id'] if subnet_cidr == cidr
+      subnets[:data].each do |subnet|
+        subnet_cidr = subnet[:subnet] + '/' + subnet[:mask]
+        subnet_id = subnet[:id] if subnet_cidr == cidr
       end
 
-      return {}.to_json if subnet_id.nil?
+      return {:message => "No subnet found"} if subnet_id.nil?
 
-      response = get("subnets/#{subnet_id.to_s}/")
+      response = @api_resource.get("subnets/#{subnet_id.to_s}/")
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_hash(json_body['data'], [:id, :subnet, :mask, :description]) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+
+      data = {
+        :id => json_body['data']['id'],
+        :subnet => json_body['data']['subnet'],
+        :mask => json_body['data']['mask'],
+        :description => json_body['data']['description']
+      }
+      
+      return {:data => data} if json_body['data']
     end
 
     def get_subnet_by_cidr(cidr)
-      response = get("subnets/cidr/#{cidr.to_s}")
+      response = @api_resource.get("subnets/cidr/#{cidr.to_s}")
       json_body = JSON.parse(response.body)
-      return {}.to_json if json_body['data'].nil?
-      json_body['data'] = filter_fields(json_body, [:id, :subnet, :description, :mask])[0]
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+
+      return {:message => "No subnet found"} if json_body['data'].nil?
+
+      data = {
+        :id => json_body['data'][0]['id'],
+        :subnet => json_body['data'][0]['subnet'],
+        :mask => json_body['data'][0]['mask'],
+        :description => json_body['data'][0]['description']
+      }
+
+      return {:data => data} if json_body['data']
     end
 
-    def get_section(section_name)
-      response = get("sections/#{section_name}/")
+    def get_group(group_name)
+      response = @api_resource.get("sections/#{group_name}/")
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_hash(json_body['data'], [:id, :name, :description]) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+      return {:message => json_body['message']} if json_body['message']
+
+      data = {
+        :id => json_body['data']['id'],
+        :name => json_body['data']['name'],
+        :description => json_body['data']['description']
+      }
+
+      return {:data => data} if json_body['data']
     end
 
-    def get_sections
-      response = get('sections/')
+    def get_groups
+      response = @api_resource.get('sections/')
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_fields(json_body, [:id, :name, :description]) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+      return {:message => json_body['message']} if json_body['message']
+
+      data = []
+      json_body['data'].each do |group|
+        data.push({
+          :id => group['id'],
+          :name => group['name'],
+          :description => group['description']
+        })
+      end
+
+      return {:data => data} if json_body['data']
     end
 
-    def get_subnets(section_id, include_id = true)
-      response = get("sections/#{section_id}/subnets/")
-      fields = [:subnet, :mask, :description]
-      fields.push(:id) if include_id
+    def get_subnets(group_id, include_id = true)
+      response = @api_resource.get("sections/#{group_id}/subnets/")
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_fields(json_body, fields) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
+      return {:message => json_body['message']} if json_body['message']
+
+      data = []
+      json_body['data'].each do |group|
+        item = {
+          :subnet => group['subnet'],
+          :mask => group['mask'],
+          :description => group['description']
+        }
+        item[:id] = group['id'] if include_id
+        data.push(item)
+      end
+
+      return {:data => data} if json_body['data']
     end
 
+    # TODO: This is always returning false
     def ip_exists(ip, subnet_id)
-      response = get("subnets/#{subnet_id.to_s}/addresses/#{ip}/")
+      response = @api_resource.get("subnets/#{subnet_id.to_s}/addresses/#{ip}/")
       json_body = JSON.parse(response.body)
-      json_body['data'] = filter_fields(json_body, [:ip]) if json_body['data']
-      json_body = filter_hash(json_body, [:data, :error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response
+      return {:message => json_body['message']} if json_body['message']
+      return {:data => true} if json_body['data']
     end
 
     def add_ip_to_subnet(ip, subnet_id, desc)
       data = {:subnetId => subnet_id, :ip => ip, :description => desc}
-      response = post('addresses/', data)
-      json_body = JSON.parse(response.body)
-      json_body = filter_hash(json_body, [:error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response
+      response = @api_resource.post('addresses/', data)
+      JSON.parse(response.body)
+      # @api_resource.transform_response(response, [:error, :message])
     end
 
     def delete_ip_from_subnet(ip, subnet_id)
-      response = delete("addresses/#{ip}/#{subnet_id.to_s}/")
-      json_body = JSON.parse(response.body)
-      json_body = filter_hash(json_body, [:error, :message])
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response
+      response = @api_resource.delete("addresses/#{ip}/#{subnet_id.to_s}/")
+      JSON.parse(response.body)
+      # @api_resource.transform_response(response, [:error, :message])
     end
 
-    def get_next_ip(subnet_id, mac, cidr, section_name)
-      response = get("subnets/#{subnet_id.to_s}/first_free/")
+    def get_next_ip(subnet_id, mac, cidr, group_name)
+      response = @api_resource.get("subnets/#{subnet_id.to_s}/first_free/")
       json_body = JSON.parse(response.body)
-      section = section_name.nil? ? "" : section_name
-      @@ip_cache[section.to_sym] = {} if @@ip_cache[section.to_sym].nil?
-      subnet_hash = @@ip_cache[section.to_sym][cidr.to_sym]
+      group = group_name.nil? ? "" : group_name
+      @ip_cache.set_group(group, {}) if @ip_cache.get_group(group).nil?
+      subnet_hash = @ip_cache.get_cidr(group, cidr)
 
-      return {:error => json_body['message']}.to_json if json_body['message']
+      return {:message => json_body['message']} if json_body['message']
 
       if subnet_hash && subnet_hash.key?(mac.to_sym)
-        json_body['data'] = @@ip_cache[section_name.to_sym][cidr.to_sym][mac.to_sym][:ip]
+        json_body['data'] = @ip_cache.get_ip(group, cidr, mac)
       else
         next_ip = nil
         new_ip = json_body['data']
@@ -151,126 +166,70 @@ module Proxy::Phpipam
 
         if ip_not_in_cache
           next_ip = new_ip.to_s
-          add_ip_to_cache(new_ip, mac, cidr, section)
+          @ip_cache.add(new_ip, mac, cidr, group)
         else
-          next_ip = find_new_ip(subnet_id, new_ip, mac, cidr, section)
+          next_ip = find_new_ip(subnet_id, new_ip, mac, cidr, group)
         end
 
-        return {:error => "Unable to find another available IP address in subnet #{cidr}"}.to_json if next_ip.nil?
-        return {:error => "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{DEFAULT_CLEANUP_INTERVAL} seconds)."}.to_json unless usable_ip(next_ip, cidr)
+        return {:error => "Unable to find another available IP address in subnet #{cidr}"} if next_ip.nil?
+        return {:error => "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{@ip_cache.get_cleanup_interval} seconds)."} unless usable_ip(next_ip, cidr)
 
         json_body['data'] = next_ip
       end
 
-      json_body = {:data => json_body['data']}
-
-      response.body = json_body.to_json
-      response.header['Content-Length'] = json_body.to_s.length
-      response.body
-    end
-
-    def start_cleanup_task
-      logger.info("Starting allocated ip address maintenance (used by get_next_ip call).")
-      @@timer_task = Concurrent::TimerTask.new(:execution_interval => DEFAULT_CLEANUP_INTERVAL) { init_cache }
-      @@timer_task.execute
+      {:data => json_body['data']}
     end
 
     def authenticated?
-      !@token.nil?
+      @api_resource.authenticated?
+    end
+
+    def subnet_exists?(subnet)
+      !(subnet[:message] && subnet[:message].downcase == "no subnet found")
+    end
+  
+    def no_free_ip_found?(ip)
+      ip[:message] && ip[:message].downcase == "no free addresses found"
+    end
+  
+    def group_exists?(group)
+      !(group && group[:message] && group[:message].downcase == "not found")
+    end
+  
+    def no_groups_found?(groups)
+      groups[:message] && groups[:message].downcase == "no sections available"
+    end
+
+    def no_subnets_found?(subnets)
+      subnets[:message] && subnets[:message].downcase == "no subnets found"
+    end
+  
+    def ip_not_found?(ip)
+      ip && ip[:message] && ip[:message].downcase == 'no addresses found'
+    end
+
+    def groups_supported?
+      true
     end
 
     private
 
-    # @@ip_cache structure
-    #
-    # Groups of subnets are cached under the External IPAM Group name. For example,
-    # "IPAM Group Name" would be the section name in phpIPAM. All IP's cached for subnets
-    # that do not have an External IPAM group specified, they are cached under the "" key. IP's
-    # are cached using one of two possible keys:
-    #    1). Mac Address
-    #    2). UUID (Used when Mac Address not specified)
-    #
-    # {
-    #   "": {
-    #     "100.55.55.0/24":{
-    #       "00:0a:95:9d:68:10": {"ip": "100.55.55.1", "timestamp": "2019-09-17 12:03:43 -D400"},
-    #       "906d8bdc-dcc0-4b59-92cb-665935e21662": {"ip": "100.55.55.2", "timestamp": "2019-09-17 11:43:22 -D400"}
-    #     },
-    #   },
-    #   "IPAM Group Name": {
-    #     "123.11.33.0/24":{
-    #       "00:0a:95:9d:68:33": {"ip": "123.11.33.1", "timestamp": "2019-09-17 12:04:43 -0400"},
-    #       "00:0a:95:9d:68:34": {"ip": "123.11.33.2", "timestamp": "2019-09-17 12:05:48 -0400"},
-    #       "00:0a:95:9d:68:35": {"ip": "123.11.33.3", "timestamp:: "2019-09-17 12:06:50 -0400"}
-    #     }
-    #   },
-    #   "Another IPAM Group": {
-    #     "185.45.39.0/24":{
-    #       "00:0a:95:9d:68:55": {"ip": "185.45.39.1", "timestamp": "2019-09-17 12:04:43 -0400"},
-    #       "00:0a:95:9d:68:56": {"ip": "185.45.39.2", "timestamp": "2019-09-17 12:05:48 -0400"}
-    #     }
-    #   }
-    # }
-    def init_cache
-      @@m.synchronize do
-        if @@ip_cache and not @@ip_cache.empty?
-          logger.debug("Processing ip cache.")
-          @@ip_cache.each do |section, subnets|
-            subnets.each do |cidr, macs|
-              macs.each do |mac, ip|
-                if Time.now - Time.parse(ip[:timestamp]) > DEFAULT_CLEANUP_INTERVAL
-                  @@ip_cache[section][cidr].delete(mac)
-                end
-              end
-              @@ip_cache[section].delete(cidr) if @@ip_cache[section][cidr].nil? or @@ip_cache[section][cidr].empty?
-            end
-          end
-        else
-          logger.debug("Clearing ip cache.")
-          @@ip_cache = {:"" => {}}
-        end
-      end
-    end
-
-    def add_ip_to_cache(ip, mac, cidr, section_name)
-      logger.debug("Adding IP #{ip} to cache for subnet #{cidr} in section #{section_name}")
-      @@m.synchronize do
-        # Clear cache data which has the same mac and ip with the new one
-
-        mac_addr = (mac.nil? || mac.empty?) ? SecureRandom.uuid : mac
-        section_hash = @@ip_cache[section_name.to_sym]
-
-        section_hash.each do |key, values|
-          if values.keys.include? mac_addr.to_sym
-            @@ip_cache[section_name.to_sym][key].delete(mac_addr.to_sym)
-          end
-          @@ip_cache[section_name.to_sym].delete(key) if @@ip_cache[section_name.to_sym][key].nil? or @@ip_cache[section_name.to_sym][key].empty?
-        end
-
-        if section_hash.key?(cidr.to_sym)
-          @@ip_cache[section_name.to_sym][cidr.to_sym][mac_addr.to_sym] = {:ip => ip.to_s, :timestamp => Time.now.to_s}
-        else
-          @@ip_cache = @@ip_cache.merge({section_name.to_sym => {cidr.to_sym => {mac_addr.to_sym => {:ip => ip.to_s, :timestamp => Time.now.to_s}}}})
-        end
-      end
-    end
-
     # Called when next available IP from external IPAM has been cached by another user/host, but
     # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and
     # see if it is available in external IPAM.
-    def find_new_ip(subnet_id, ip, mac, cidr, section_name)
+    def find_new_ip(subnet_id, ip, mac, cidr, group_name)
       found_ip = nil
       temp_ip = ip
       retry_count = 0
 
       loop do
         new_ip = increment_ip(temp_ip)
-        verify_ip = JSON.parse(ip_exists(new_ip, subnet_id).body)
+        verify_ip = ip_exists(new_ip, subnet_id)
 
         # If new IP doesn't exist in IPAM and not in the cache
-        if ip_not_found_in_ipam?(verify_ip) && !ip_exists_in_cache(new_ip, cidr, mac, section_name)
+        if ip_not_found_in_ipam?(verify_ip) && !@ip_cache.ip_exists(new_ip, cidr, mac, group_name)
           found_ip = new_ip.to_s
-          add_ip_to_cache(found_ip, mac, cidr, section_name)
+          @ip_cache.add(found_ip, mac, cidr, group_name)
           break
         end
 
@@ -283,66 +242,6 @@ module Proxy::Phpipam
       return ip if found_ip.nil?
 
       found_ip
-    end
-
-    def increment_ip(ip)
-      IPAddr.new(ip.to_s).succ.to_s
-    end
-
-    def ip_exists_in_cache(ip, cidr, mac, section_name)
-      @@ip_cache[section_name.to_sym][cidr.to_sym] && @@ip_cache[section_name.to_sym][cidr.to_sym].to_s.include?(ip.to_s)
-    end
-
-    # Checks if given IP is within a subnet. Broadcast address is considered unusable
-    def usable_ip(ip, cidr)
-      network = IPAddr.new(cidr)
-      network.include?(IPAddr.new(ip)) && network.to_range.last != ip
-    end
-
-    def get(path)
-      uri = URI(@api_base + path)
-      request = Net::HTTP::Get.new(uri)
-      request['token'] = @token
-
-      Net::HTTP.start(uri.hostname, uri.port, :use_ssl => uri.scheme == 'https') {|http|
-        http.request(request)
-      }
-    end
-
-    def delete(path, body=nil)
-      uri = URI(@api_base + path)
-      uri.query = URI.encode_www_form(body) if body
-      request = Net::HTTP::Delete.new(uri)
-      request['token'] = @token
-
-      Net::HTTP.start(uri.hostname, uri.port, :use_ssl => uri.scheme == 'https') {|http|
-        http.request(request)
-      }
-    end
-
-    def post(path, body=nil)
-      uri = URI(@api_base + path)
-      uri.query = URI.encode_www_form(body) if body
-      request = Net::HTTP::Post.new(uri)
-      request['token'] = @token
-
-      Net::HTTP.start(uri.hostname, uri.port, :use_ssl => uri.scheme == 'https') {|http|
-        http.request(request)
-      }
-    end
-
-    def authenticate
-      auth_uri = URI(@api_base + '/user/')
-      request = Net::HTTP::Post.new(auth_uri)
-      request.basic_auth @conf[:user], @conf[:password]
-
-      response = Net::HTTP.start(auth_uri.hostname, auth_uri.port, :use_ssl => auth_uri.scheme == 'https') {|http|
-        http.request(request)
-      }
-
-      response = JSON.parse(response.body)
-      logger.warn(response['message']) if response['message']
-      @token = response.dig('data', 'token')
     end
   end
 end

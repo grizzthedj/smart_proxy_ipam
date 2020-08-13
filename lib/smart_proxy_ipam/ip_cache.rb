@@ -15,8 +15,9 @@ module Proxy::Ipam
     @@ip_cache = nil
     @@timer_task = nil
 
-    def initialize
+    def initialize(params = {})
       @@m = Monitor.new
+      @provider = params[:provider].to_s
       init_cache if @@ip_cache.nil?
       start_cleanup_task if @@timer_task.nil?
     end
@@ -47,7 +48,7 @@ module Proxy::Ipam
     end
 
     def add(ip, mac, cidr, group_name)
-      logger.debug("Adding IP #{ip} to cache for subnet #{cidr} in group #{group_name}")
+      logger.debug("Adding IP '#{ip}' to cache for subnet '#{cidr}' in group '#{group_name}' for provider #{@provider}")
       @@m.synchronize do
         mac_addr = mac.nil? || mac.empty? ? SecureRandom.uuid : mac
         group_hash = @@ip_cache[group_name.to_sym]
@@ -70,7 +71,7 @@ module Proxy::Ipam
     private
 
     def start_cleanup_task
-      logger.info('Starting allocated ip address maintenance (used by get_next_ip call).')
+      logger.info("Starting ip cache maintenance for provider #{@provider}, used by /next_ip.")
       @@timer_task = Concurrent::TimerTask.new(execution_interval: DEFAULT_CLEANUP_INTERVAL) { init_cache }
       @@timer_task.execute
     end
@@ -108,7 +109,7 @@ module Proxy::Ipam
     def init_cache
       @@m.synchronize do
         if @@ip_cache && !@@ip_cache.empty?
-          logger.debug('Processing ip cache.')
+          logger.debug("Processing ip cache for provider #{@provider}")
           @@ip_cache.each do |group, subnets|
             subnets.each do |cidr, macs|
               macs.each do |mac, ip|
@@ -120,7 +121,7 @@ module Proxy::Ipam
             end
           end
         else
-          logger.debug('Clearing ip cache.')
+          logger.debug("Clearing ip cache for provider #{@provider}")
           @@ip_cache = {'': {}}
         end
       end

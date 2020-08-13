@@ -3,7 +3,7 @@ require File.expand_path('lib/smart_proxy_ipam/version', __dir__)
 Gem::Specification.new do |s|
   s.name = 'smart_proxy_ipam'
   s.version = Proxy::Ipam::VERSION
-  s.required_ruby_version = '2.4'
+  s.required_ruby_version = '2.6.3'
 
   s.summary = 'Smart proxy plugin for IPAM integration with various IPAM providers'
   s.description = 'Smart proxy plugin for IPAM integration with various IPAM providers'

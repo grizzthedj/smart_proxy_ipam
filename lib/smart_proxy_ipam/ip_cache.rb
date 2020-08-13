@@ -6,11 +6,12 @@ require 'time'
 require 'smart_proxy_ipam/ipam_helper'
 
 module Proxy::Ipam
+  # Class for managing temp in-memory cache to prevent same IP's being suggested in race conditions
   class IpCache
     include Proxy::Log
     include IpamHelper
 
-    DEFAULT_CLEANUP_INTERVAL = 60  # 2 mins
+    DEFAULT_CLEANUP_INTERVAL = 60
     @@ip_cache = nil
     @@timer_task = nil
 
@@ -33,11 +34,6 @@ module Proxy::Ipam
     end
 
     def get_ip(group_name, cidr, mac)
-      puts "============================="
-      puts "GROUP: #{group_name}"
-      puts "CIDR: #{cidr}"
-      puts "MAC: #{mac}"
-      puts "============================="
       @@ip_cache[group_name.to_sym][cidr.to_sym][mac.to_sym][:ip]
     end
 
@@ -45,27 +41,28 @@ module Proxy::Ipam
       DEFAULT_CLEANUP_INTERVAL
     end
 
-    def ip_exists(ip, cidr, mac, group_name)
-      @@ip_cache[group_name.to_sym][cidr.to_sym] && @@ip_cache[group_name.to_sym][cidr.to_sym].to_s.include?(ip.to_s)
+    def ip_exists(ip, cidr, group_name)
+      cidr_key = @@ip_cache[group_name.to_sym][cidr.to_sym]&.to_s
+      cidr_key.include?(ip.to_s)
     end
 
     def add(ip, mac, cidr, group_name)
       logger.debug("Adding IP #{ip} to cache for subnet #{cidr} in group #{group_name}")
       @@m.synchronize do
-        mac_addr = (mac.nil? || mac.empty?) ? SecureRandom.uuid : mac
+        mac_addr = mac.nil? || mac.empty? ? SecureRandom.uuid : mac
         group_hash = @@ip_cache[group_name.to_sym]
 
         group_hash.each do |key, values|
           if values.keys.include? mac_addr.to_sym
             @@ip_cache[group_name.to_sym][key].delete(mac_addr.to_sym)
           end
-          @@ip_cache[group_name.to_sym].delete(key) if @@ip_cache[group_name.to_sym][key].nil? or @@ip_cache[group_name.to_sym][key].empty?
+          @@ip_cache[group_name.to_sym].delete(key) if @@ip_cache[group_name.to_sym][key].nil? || @@ip_cache[group_name.to_sym][key].empty?
         end
 
         if group_hash.key?(cidr.to_sym)
-          @@ip_cache[group_name.to_sym][cidr.to_sym][mac_addr.to_sym] = {:ip => ip.to_s, :timestamp => Time.now.to_s}
+          @@ip_cache[group_name.to_sym][cidr.to_sym][mac_addr.to_sym] = {ip: ip.to_s, timestamp: Time.now.to_s}
         else
-          @@ip_cache = @@ip_cache.merge({group_name.to_sym => {cidr.to_sym => {mac_addr.to_sym => {:ip => ip.to_s, :timestamp => Time.now.to_s}}}})
+          @@ip_cache = @@ip_cache.merge({group_name.to_sym => {cidr.to_sym => {mac_addr.to_sym => {ip: ip.to_s, timestamp: Time.now.to_s}}}})
         end
       end
     end
@@ -73,8 +70,8 @@ module Proxy::Ipam
     private
 
     def start_cleanup_task
-      logger.info("Starting allocated ip address maintenance (used by get_next_ip call).")
-      @@timer_task = Concurrent::TimerTask.new(:execution_interval => DEFAULT_CLEANUP_INTERVAL) { init_cache }
+      logger.info('Starting allocated ip address maintenance (used by get_next_ip call).')
+      @@timer_task = Concurrent::TimerTask.new(execution_interval: DEFAULT_CLEANUP_INTERVAL) { init_cache }
       @@timer_task.execute
     end
 
@@ -110,8 +107,8 @@ module Proxy::Ipam
     # }
     def init_cache
       @@m.synchronize do
-        if @@ip_cache and not @@ip_cache.empty?
-          logger.debug("Processing ip cache.")
+        if @@ip_cache && !@@ip_cache.empty?
+          logger.debug('Processing ip cache.')
           @@ip_cache.each do |group, subnets|
             subnets.each do |cidr, macs|
               macs.each do |mac, ip|
@@ -119,12 +116,12 @@ module Proxy::Ipam
                   @@ip_cache[group][cidr].delete(mac)
                 end
               end
-              @@ip_cache[group].delete(cidr) if @@ip_cache[group][cidr].nil? or @@ip_cache[group][cidr].empty?
+              @@ip_cache[group].delete(cidr) if @@ip_cache[group][cidr].nil? || @@ip_cache[group][cidr].empty?
             end
           end
         else
-          logger.debug("Clearing ip cache.")
-          @@ip_cache = {:"" => {}}
+          logger.debug('Clearing ip cache.')
+          @@ip_cache = {'': {}}
         end
       end
     end

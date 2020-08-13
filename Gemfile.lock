@@ -12,11 +12,12 @@ GIT
 PATH
   remote: .
   specs:
-    smart_proxy_ipam (0.0.20)
+    smart_proxy_ipam (0.1.0)
 
 GEM
   remote: https://rubygems.org/
   specs:
+    ast (2.4.1)
     concurrent-ruby (1.1.5)
     json (2.2.0)
     little-plugger (1.1.4)
@@ -28,13 +29,31 @@ GEM
       metaclass (~> 0.0.1)
     multi_json (1.13.1)
     mustermann (1.0.3)
+    parallel (1.19.2)
+    parser (2.7.1.4)
+      ast (~> 2.4.1)
     power_assert (1.1.4)
     rack (2.0.8)
     rack-protection (2.0.5)
       rack
     rack-test (1.1.0)
       rack (>= 1.0, < 3)
+    rainbow (3.0.0)
     rake (13.0.1)
+    regexp_parser (1.7.1)
+    rexml (3.2.4)
+    rubocop (0.89.1)
+      parallel (~> 1.10)
+      parser (>= 2.7.1.1)
+      rainbow (>= 2.2.2, < 4.0)
+      regexp_parser (>= 1.7)
+      rexml
+      rubocop-ast (>= 0.3.0, < 1.0)
+      ruby-progressbar (~> 1.7)
+      unicode-display_width (>= 1.4.0, < 2.0)
+    rubocop-ast (0.3.0)
+      parser (>= 2.7.1.4)
+    ruby-progressbar (1.10.1)
     sinatra (2.0.5)
       mustermann (~> 1.0)
       rack (~> 2.0)
@@ -43,6 +62,7 @@ GEM
     test-unit (3.3.3)
       power_assert
     tilt (2.0.9)
+    unicode-display_width (1.7.0)
 
 PLATFORMS
   ruby
@@ -53,6 +73,7 @@ DEPENDENCIES
   mocha
   rack-test
   rake
+  rubocop
   smart_proxy!
   smart_proxy_ipam!
   test-unit

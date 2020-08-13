@@ -1,8 +1,7 @@
 require 'test_helper'
 require 'rack/test'
 require 'test/unit'
-
-require 'smart_proxy_ipam/phpipam/phpipam_api'
+require 'smart_proxy_ipam/ipam_api'
 
 ENV['RACK_ENV'] = 'test'
 

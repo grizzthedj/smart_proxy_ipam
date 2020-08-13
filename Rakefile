@@ -1,9 +1,8 @@
-
 require 'rake'
 require 'rake/testtask'
 
 desc 'Default: run unit tests.'
-task :default => :test
+task default: :test
 
 desc 'Test smart_proxy_ipam Plugin'
 Rake::TestTask.new(:test) do |t|

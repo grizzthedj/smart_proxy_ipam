@@ -1,4 +1,3 @@
-
 require 'smart_proxy_ipam/ipam_api'
 
 map '/ipam' do

@@ -1,4 +1,3 @@
-
 module Proxy::Ipam
   extend ::Proxy::Util
   extend ::Proxy::Log

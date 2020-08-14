@@ -13,7 +13,8 @@ module IpamHelper
     when 'netbox'
       client = Proxy::Ipam::NetboxClient.allocate
     else
-      # Setting phpIPAM as default provider, when provider not specified, not to break existing implementations
+      # Setting phpIPAM as default provider, when provider not specified,
+      # not to break existing implementations
       client = Proxy::Ipam::PhpipamClient.allocate
       # After some time, raise an exception for unknown provider
       # halt 500, { error: 'Unknown IPAM provider' }.to_json
@@ -60,7 +61,7 @@ module IpamHelper
   def validate_ip!(ip)
     IPAddr.new(ip).to_s
   rescue IPAddr::InvalidAddressError
-    return nil
+    nil
   end
 
   def validate_cidr!(address, prefix)
@@ -68,8 +69,8 @@ module IpamHelper
     network = IPAddr.new(cidr).to_s
     return nil if network != IPAddr.new(address).to_s
     cidr
-  rescue IPAddr::Error => e
-    return nil
+  rescue IPAddr::Error
+    nil
   end
 
   def validate_ip_in_cidr!(ip, cidr)

@@ -27,7 +27,7 @@ module Proxy::Ipam
       raise 'The configuration for phpipam is not present in externalipam.yml' unless config
       api_base = "#{config[:url]}/api/#{config[:user]}/"
       @api_resource = ApiResource.new(api_base: api_base, config: config)
-      @api_resource.authenticate('/user/') 
+      @api_resource.authenticate('/user/')
       @ip_cache = IpCache.new(provider: provider)
     end
 

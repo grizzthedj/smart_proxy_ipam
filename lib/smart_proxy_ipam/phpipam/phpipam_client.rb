@@ -31,16 +31,16 @@ module Proxy::Ipam
       @ip_cache = IpCache.new(provider: provider)
     end
 
-    def get_subnet(cidr, group_id = nil)
+    def get_ipam_subnet(cidr, group_id = nil)
       if group_id.nil? || group_id.empty?
-        get_subnet_by_cidr(cidr)
+        get_ipam_subnet_by_cidr(cidr)
       else
-        get_subnet_by_group(cidr, group_id)
+        get_ipam_subnet_by_group(cidr, group_id)
       end
     end
 
-    def get_subnet_by_group(cidr, group_id, include_id = true)
-      subnets = get_subnets(group_id, include_id)
+    def get_ipam_subnet_by_group(cidr, group_id, include_id = true)
+      subnets = get_ipam_subnets(group_id, include_id)
       subnet_id = nil
 
       subnets[:data].each do |subnet|
@@ -63,7 +63,7 @@ module Proxy::Ipam
       return { data: data } if json_body['data']
     end
 
-    def get_subnet_by_cidr(cidr)
+    def get_ipam_subnet_by_cidr(cidr)
       response = @api_resource.get("subnets/cidr/#{cidr}")
       json_body = JSON.parse(response.body)
 
@@ -79,7 +79,7 @@ module Proxy::Ipam
       return { data: data } if json_body['data']
     end
 
-    def get_group(group_name)
+    def get_ipam_group(group_name)
       response = @api_resource.get("sections/#{group_name}/")
       json_body = JSON.parse(response.body)
       return { message: json_body['message'] } if json_body['message']
@@ -93,7 +93,7 @@ module Proxy::Ipam
       return { data: data } if json_body['data']
     end
 
-    def get_groups
+    def get_ipam_groups
       response = @api_resource.get('sections/')
       json_body = JSON.parse(response.body)
       return { message: json_body['message'] } if json_body['message']
@@ -110,7 +110,7 @@ module Proxy::Ipam
       return { data: data } if json_body['data']
     end
 
-    def get_subnets(group_id, include_id = true)
+    def get_ipam_subnets(group_id, include_id = true)
       response = @api_resource.get("sections/#{group_id}/subnets/")
       json_body = JSON.parse(response.body)
       return { message: json_body['message'] } if json_body['message']

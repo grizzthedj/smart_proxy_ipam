@@ -6,7 +6,7 @@ require 'net/http'
 
 # Module containing helper methods for use by all External IPAM provider implementations
 module IpamHelper
-  def provider_instance(provider)
+  def get_provider_instance(provider)
     case provider
     when 'phpipam'
       client = Proxy::Ipam::PhpipamClient.allocate
@@ -24,15 +24,15 @@ module IpamHelper
     client
   end
 
-  def get_subnet(provider, group_name, cidr)
+  def get_ipam_subnet(provider, group_name, cidr)
     subnet = nil
     if group_name
-      group = provider.get_group(group_name)
+      group = provider.get_ipam_group(group_name)
       halt 500, { error: 'Groups are not supported' }.to_json unless provider.groups_supported?
       halt 404, { error: "No group #{group_name} found" }.to_json unless provider.group_exists?(group)
-      subnet = provider.get_subnet(cidr, group[:data][:id])
+      subnet = provider.get_ipam_subnet(cidr, group[:data][:id])
     else
-      subnet = provider.get_subnet(cidr)
+      subnet = provider.get_ipam_subnet(cidr)
     end
     subnet
   end
@@ -83,25 +83,25 @@ module IpamHelper
     mac
   end
 
-  def request_ip(params)
+  def get_request_ip(params)
     ip = validate_ip!(params[:ip])
     halt 400, { error: errors[:bad_ip] }.to_json if ip.nil?
     ip
   end
 
-  def request_cidr(params)
+  def get_request_cidr(params)
     cidr = validate_cidr!(params[:address], params[:prefix])
     halt 400, { error: errors[:bad_cidr] }.to_json if cidr.nil?
     cidr
   end
 
-  def request_mac(params)
+  def get_request_mac(params)
     mac = validate_mac!(params[:mac])
     halt 400, { error: errors[:bad_mac] }.to_json if mac.nil?
     mac
   end
 
-  def request_group(params, provider)
+  def get_request_group(params, provider)
     group = params[:group] ? URI.escape(params[:group]) : nil
     halt 500, { error: errors[:groups_not_supported] }.to_json if !provider.groups_supported? && group
     group

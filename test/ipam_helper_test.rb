@@ -5,7 +5,7 @@ require 'smart_proxy_ipam/ipam_helper'
 
 ENV['RACK_ENV'] = 'test'
 
-class PhpipamApiTest < ::Test::Unit::TestCase
+class IpamHelperTest < ::Test::Unit::TestCase
   include Rack::Test::Methods
   include IpamHelper
 
@@ -32,7 +32,7 @@ class PhpipamApiTest < ::Test::Unit::TestCase
   end
 
   def test_validate_ip_should_return_nil_for_invalid_ip_address
-    bad_ip = 'this is not a mac address'
+    bad_ip = 'this is not an ip address'
     validated_ip = validate_ip!(bad_ip)
     assert validated_ip.nil?
   end

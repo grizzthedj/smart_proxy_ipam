@@ -39,28 +39,30 @@ module Proxy::Ipam
     #     Http Code:     404
     #     JSON Response:
     #       {"error": "There are no free IP's in subnet 100.55.55.0/24"}
-    get '/:provider/subnet/:address/:prefix/next_ip' do
-      content_type :json
+    ['/:provider/subnet/:address/:prefix/next_ip', '/subnet/:address/:prefix/next_ip'].each do |path|
+      get path do
+        content_type :json
 
-      begin
-        validate_presence_of!([:provider, :address, :prefix, :mac], params)
+        begin
+          validate_presence_of!([:address, :prefix, :mac], params)
 
-        mac = get_request_mac(params)
-        cidr = get_request_cidr(params)
-        provider = get_provider_instance(params[:provider])
-        group_name = get_request_group(params, provider)
-        subnet = get_ipam_subnet(provider, group_name, cidr)
+          mac = get_request_mac(params)
+          cidr = get_request_cidr(params)
+          provider = get_provider_instance(params[:provider])
+          group_name = get_request_group(params, provider)
+          subnet = get_ipam_subnet(provider, group_name, cidr)
 
-        halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
-        next_ip = provider.get_next_ip(subnet[:data][:id], mac, cidr, group_name)
-        halt 404, { error: errors[:no_free_ips] }.to_json if provider.no_free_ip_found?(next_ip)
-        next_ip.to_json
-      rescue RuntimeError => e
-        logger.warn(e.message)
-        halt 500, { error: e.message }.to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+          halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
+          next_ip = provider.get_next_ip(subnet[:data][:id], mac, cidr, group_name)
+          halt 404, { error: errors[:no_free_ips] }.to_json if provider.no_free_ip_found?(next_ip)
+          next_ip.to_json
+        rescue RuntimeError => e
+          logger.warn(e.message)
+          halt 500, { error: e.message }.to_json
+        rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+          logger.warn(errors[:no_connection])
+          halt 500, { error: errors[:no_connection] }.to_json
+        end
       end
     end
 
@@ -88,25 +90,27 @@ module Proxy::Ipam
     #     Http Code:     404
     #     JSON Response:
     #       {"error": "No subnets found"}
-    get '/:provider/subnet/:address/:prefix' do
-      content_type :json
+    ['/:provider/subnet/:address/:prefix', '/subnet/:address/:prefix'].each do |path|
+      get path do
+        content_type :json
 
-      begin
-        validate_presence_of!([:provider, :address, :prefix], params)
+        begin
+          validate_presence_of!([:address, :prefix], params)
 
-        cidr = get_request_cidr(params)
-        provider = get_provider_instance(params[:provider])
-        group_name = get_request_group(params, provider)
-        subnet = get_ipam_subnet(provider, group_name, cidr)
+          cidr = get_request_cidr(params)
+          provider = get_provider_instance(params[:provider])
+          group_name = get_request_group(params, provider)
+          subnet = get_ipam_subnet(provider, group_name, cidr)
 
-        halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
-        subnet.to_json
-      rescue RuntimeError => e
-        logger.warn(e.message)
-        halt 500, { error: e.message }.to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+          halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
+          subnet.to_json
+        rescue RuntimeError => e
+          logger.warn(e.message)
+          halt 500, { error: e.message }.to_json
+        rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+          logger.warn(errors[:no_connection])
+          halt 500, { error: errors[:no_connection] }.to_json
+        end
       end
     end
 
@@ -135,24 +139,23 @@ module Proxy::Ipam
     #     Http Code:     500
     #     JSON Response:
     #       {"error": "Groups are not supported"}
-    get '/:provider/groups' do
-      content_type :json
+    ['/:provider/groups', '/groups'].each do |path|
+      get path do
+        content_type :json
 
-      begin
-        validate_presence_of!([:provider], params)
-
-        provider = get_provider_instance(params[:provider])
-
-        halt 500, { error: errors[:groups_not_supported] }.to_json unless provider.groups_supported?
-        groups = provider.get_ipam_groups
-        halt 404, { error: errors[:no_groups] }.to_json if provider.no_groups_found?(groups)
-        groups.to_json
-      rescue RuntimeError => e
-        logger.warn(e.message)
-        halt 500, { error: e.message }.to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+        begin
+          provider = get_provider_instance(params[:provider])
+          halt 500, { error: errors[:groups_not_supported] }.to_json unless provider.groups_supported?
+          groups = provider.get_ipam_groups
+          halt 404, { error: errors[:no_groups] }.to_json if provider.no_groups_found?(groups)
+          groups.to_json
+        rescue RuntimeError => e
+          logger.warn(e.message)
+          halt 500, { error: e.message }.to_json
+        rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+          logger.warn(errors[:no_connection])
+          halt 500, { error: errors[:no_connection] }.to_json
+        end
       end
     end
 
@@ -179,24 +182,26 @@ module Proxy::Ipam
     #     Http Code:     500
     #     JSON Response:
     #       {"error": "Groups are not supported"}
-    get '/:provider/groups/:group' do
-      content_type :json
+    ['/:provider/groups/:group', '/groups/:group'].each do |path|
+      get path do
+        content_type :json
 
-      begin
-        validate_presence_of!([:provider, :group], params)
+        begin
+          validate_presence_of!([:group], params)
 
-        provider = get_provider_instance(params[:provider])
-        group_name = get_request_group(params, provider)
-        group = provider.get_ipam_group(group_name)
+          provider = get_provider_instance(params[:provider])
+          group_name = get_request_group(params, provider)
+          group = provider.get_ipam_group(group_name)
 
-        halt 404, { error: errors[:no_group] }.to_json unless provider.group_exists?(group)
-        group.to_json
-      rescue RuntimeError => e
-        logger.warn(e.message)
-        halt 500, { error: e.message }.to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+          halt 404, { error: errors[:no_group] }.to_json unless provider.group_exists?(group)
+          group.to_json
+        rescue RuntimeError => e
+          logger.warn(e.message)
+          halt 500, { error: e.message }.to_json
+        rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+          logger.warn(errors[:no_connection])
+          halt 500, { error: errors[:no_connection] }.to_json
+        end
       end
     end
 
@@ -226,26 +231,28 @@ module Proxy::Ipam
     #     Http Code:     500
     #     JSON Response:
     #       {"error": "Groups are not supported"}
-    get '/:provider/groups/:group/subnets' do
-      content_type :json
+    ['/:provider/groups/:group/subnets', '/groups/:group/subnets'].each do |path|
+      get path do
+        content_type :json
 
-      begin
-        validate_presence_of!([:provider, :group], params)
+        begin
+          validate_presence_of!([:group], params)
 
-        provider = get_provider_instance(params[:provider])
-        group_name = get_request_group(params, provider)
-        group = provider.get_ipam_group(group_name)
+          provider = get_provider_instance(params[:provider])
+          group_name = get_request_group(params, provider)
+          group = provider.get_ipam_group(group_name)
 
-        halt 404, { error: errors[:no_group] }.to_json unless provider.group_exists?(group)
-        subnets = provider.get_ipam_subnets(group[:data][:id].to_s, false)
-        halt 404, { error: errors[:no_subnets_in_group] }.to_json if provider.no_subnets_found?(subnets)
-        subnets.to_json
-      rescue RuntimeError => e
-        logger.warn(e.message)
-        halt 500, { error: e.message }.to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+          halt 404, { error: errors[:no_group] }.to_json unless provider.group_exists?(group)
+          subnets = provider.get_ipam_subnets(group[:data][:id].to_s, false)
+          halt 404, { error: errors[:no_subnets_in_group] }.to_json if provider.no_subnets_found?(subnets)
+          subnets.to_json
+        rescue RuntimeError => e
+          logger.warn(e.message)
+          halt 500, { error: e.message }.to_json
+        rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+          logger.warn(errors[:no_connection])
+          halt 500, { error: errors[:no_connection] }.to_json
+        end
       end
     end
 
@@ -261,37 +268,37 @@ module Proxy::Ipam
     #   Response if exists:
     #   ===========================
     #     Http Code:  200
-    #     Response:   Empty
+    #     Response:   true
     #
     #   Response if not exists:
     #   ===========================
-    #     Http Code:     404
-    #     JSON Response:
-    #       {"error": "IP address not found"}
-    get '/:provider/subnet/:address/:prefix/:ip' do
-      content_type :json
+    #     Http Code:      200
+    #     JSON Response:  false
+    ['/:provider/subnet/:address/:prefix/:ip', '/subnet/:address/:prefix/:ip'].each do |path|
+      get path do
+        content_type :json
 
-      begin
-        validate_presence_of!([:provider, :address, :prefix, :ip], params)
+        begin
+          validate_presence_of!([:address, :prefix, :ip], params)
 
-        ip = get_request_ip(params)
-        cidr = get_request_cidr(params)
-        provider = get_provider_instance(params[:provider])
-        group_name = get_request_group(params, provider)
-        subnet = get_ipam_subnet(provider, group_name, cidr)
+          ip = get_request_ip(params)
+          cidr = get_request_cidr(params)
+          provider = get_provider_instance(params[:provider])
+          group_name = get_request_group(params, provider)
+          subnet = get_ipam_subnet(provider, group_name, cidr)
 
-        validate_ip_in_cidr!(ip, cidr)
+          validate_ip_in_cidr!(ip, cidr)
 
-        halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
-        ip_exists = provider.ip_exists?(ip, subnet[:data][:id])
-        halt 404, { error: errors[:no_ip] }.to_json unless ip_exists
-        halt 200
-      rescue RuntimeError => e
-        logger.warn(e.message)
-        halt 500, { error: e.message }.to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+          halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
+          ip_exists = provider.ip_exists?(ip, subnet[:data][:id])
+          halt 200, ip_exists.to_json
+        rescue RuntimeError => e
+          logger.warn(e.message)
+          halt 500, { error: e.message }.to_json
+        rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+          logger.warn(errors[:no_connection])
+          halt 500, { error: errors[:no_connection] }.to_json
+        end
       end
     end
 
@@ -314,30 +321,32 @@ module Proxy::Ipam
     #     Http Code:  500
     #     JSON Response:
     #       {"error": "Unable to add IP to External IPAM"}
-    post '/:provider/subnet/:address/:prefix/:ip' do
-      content_type :json
+    ['/:provider/subnet/:address/:prefix/:ip', '/subnet/:address/:prefix/:ip'].each do |path|
+      post path do
+        content_type :json
 
-      begin
-        validate_presence_of!([:provider, :address, :ip, :prefix], params)
+        begin
+          validate_presence_of!([:address, :ip, :prefix], params)
 
-        ip = get_request_ip(params)
-        cidr = get_request_cidr(params)
-        provider = get_provider_instance(params[:provider])
-        group_name = get_request_group(params, provider)
-        subnet = get_ipam_subnet(provider, group_name, cidr)
+          ip = get_request_ip(params)
+          cidr = get_request_cidr(params)
+          provider = get_provider_instance(params[:provider])
+          group_name = get_request_group(params, provider)
+          subnet = get_ipam_subnet(provider, group_name, cidr)
 
-        validate_ip_in_cidr!(ip, cidr)
+          validate_ip_in_cidr!(ip, cidr)
 
-        halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
-        ip_added = provider.add_ip_to_subnet(ip, subnet[:data][:id], 'Address auto added by Foreman')
-        halt 500, ip_added.to_json unless ip_added.nil?
-        halt 201
-      rescue RuntimeError => e
-        logger.warn(e.message)
-        halt 500, { error: e.message }.to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+          halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
+          ip_added = provider.add_ip_to_subnet(ip, subnet[:data][:id], 'Address auto added by Foreman')
+          halt 500, ip_added.to_json unless ip_added.nil?
+          halt 201
+        rescue RuntimeError => e
+          logger.warn(e.message)
+          halt 500, { error: e.message }.to_json
+        rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+          logger.warn(errors[:no_connection])
+          halt 500, { error: errors[:no_connection] }.to_json
+        end
       end
     end
 
@@ -360,30 +369,32 @@ module Proxy::Ipam
     #     Http Code:  500
     #     JSON Response:
     #       {"error": "Unable to delete IP from External IPAM"}
-    delete '/:provider/subnet/:address/:prefix/:ip' do
-      content_type :json
+    ['/:provider/subnet/:address/:prefix/:ip', '/subnet/:address/:prefix/:ip'].each do |path|
+      delete path do
+        content_type :json
 
-      begin
-        validate_presence_of!([:provider, :address, :ip, :prefix], params)
+        begin
+          validate_presence_of!([:address, :ip, :prefix], params)
 
-        ip = get_request_ip(params)
-        cidr = get_request_cidr(params)
-        group_name = URI.escape(params[:group]) if params[:group]
-        provider = get_provider_instance(params[:provider])
-        subnet = get_ipam_subnet(provider, group_name, cidr)
+          ip = get_request_ip(params)
+          cidr = get_request_cidr(params)
+          group_name = URI.escape(params[:group]) if params[:group]
+          provider = get_provider_instance(params[:provider])
+          subnet = get_ipam_subnet(provider, group_name, cidr)
 
-        validate_ip_in_cidr!(ip, cidr)
+          validate_ip_in_cidr!(ip, cidr)
 
-        halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
-        ip_deleted = provider.delete_ip_from_subnet(ip, subnet[:data][:id])
-        halt 500, ip_deleted.to_json unless ip_deleted.nil?
-        halt 200
-      rescue RuntimeError => e
-        logger.warn(e.message)
-        halt 500, { error: e.message }.to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+          halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
+          ip_deleted = provider.delete_ip_from_subnet(ip, subnet[:data][:id])
+          halt 500, ip_deleted.to_json unless ip_deleted.nil?
+          halt 200
+        rescue RuntimeError => e
+          logger.warn(e.message)
+          halt 500, { error: e.message }.to_json
+        rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+          logger.warn(errors[:no_connection])
+          halt 500, { error: errors[:no_connection] }.to_json
+        end
       end
     end
   end

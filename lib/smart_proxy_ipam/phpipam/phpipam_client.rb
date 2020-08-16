@@ -156,13 +156,13 @@ module Proxy::Ipam
       group = group_name.nil? ? '' : group_name
       @ip_cache.set_group(group, {}) if @ip_cache.get_group(group).nil?
       subnet_hash = @ip_cache.get_cidr(group, cidr)
+      next_ip = nil
 
       return { message: json_body['message'] } if json_body['message']
 
       if subnet_hash&.key?(mac.to_sym)
-        json_body['data'] = @ip_cache.get_ip(group, cidr, mac)
+        next_ip = @ip_cache.get_ip(group, cidr, mac)
       else
-        next_ip = nil
         new_ip = json_body['data']
         ip_not_in_cache = subnet_hash.nil? ? true : !subnet_hash.to_s.include?(new_ip.to_s)
 
@@ -175,11 +175,9 @@ module Proxy::Ipam
 
         return { error: "Unable to find another available IP address in subnet #{cidr}" } if next_ip.nil?
         return { error: "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{@ip_cache.get_cleanup_interval} seconds)." } unless usable_ip(next_ip, cidr)
-
-        json_body['data'] = next_ip
       end
 
-      { data: json_body['data'] }
+      next_ip
     end
 
     def authenticated?
@@ -191,7 +189,7 @@ module Proxy::Ipam
     end
 
     def no_free_ip_found?(ip)
-      ip[:message] && ip[:message].downcase == 'no free addresses found'
+      ip.is_a?(Hash) && ip[:message] && ip[:message].downcase == 'no free addresses found'
     end
 
     def group_exists?(group)

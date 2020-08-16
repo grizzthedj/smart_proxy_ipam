@@ -1,8 +1,6 @@
 require 'net/http'
 # TODO: Refactor & update foreman_ipam plugin with Netbox
-# TODO: Fix/add tests
 # TODO: Update all API documentation in plugin and foreman core(use Swagger docs for plugin?)
-# TODO: URI.escape => CGI.escape, and enable Lint/UriEscapeUnescape in .rubocop.yml
 
 # Module containing helper methods for use by all External IPAM provider implementations
 module IpamHelper
@@ -27,14 +25,16 @@ module IpamHelper
 
   def get_ipam_subnet(provider, group_name, cidr)
     subnet = nil
-    if group_name
+
+    if group_name.nil? || group_name.empty?
+      subnet = provider.get_ipam_subnet(cidr)
+    else
       group = provider.get_ipam_group(group_name)
       halt 500, { error: 'Groups are not supported' }.to_json unless provider.groups_supported?
       halt 404, { error: "No group #{group_name} found" }.to_json unless provider.group_exists?(group)
       subnet = provider.get_ipam_subnet(cidr, group[:data][:id])
-    else
-      subnet = provider.get_ipam_subnet(cidr)
     end
+
     subnet
   end
 

@@ -43,7 +43,7 @@ module Proxy::Ipam
       subnets = get_ipam_subnets(group_id, include_id)
       subnet_id = nil
 
-      subnets[:data].each do |subnet|
+      subnets.each do |subnet|
         subnet_cidr = subnet[:subnet] + '/' + subnet[:mask]
         subnet_id = subnet[:id] if subnet_cidr == cidr
       end
@@ -60,7 +60,7 @@ module Proxy::Ipam
         description: json_body['data']['description']
       }
 
-      return { data: data } if json_body['data']
+      return data if json_body['data']
     end
 
     def get_ipam_subnet_by_cidr(cidr)
@@ -76,7 +76,7 @@ module Proxy::Ipam
         description: json_body['data'][0]['description']
       }
 
-      return { data: data } if json_body['data']
+      return data if json_body['data']
     end
 
     def get_ipam_group(group_name)
@@ -90,7 +90,7 @@ module Proxy::Ipam
         description: json_body['data']['description']
       }
 
-      return { data: data } if json_body['data']
+      return data if json_body['data']
     end
 
     def get_ipam_groups
@@ -107,7 +107,7 @@ module Proxy::Ipam
         })
       end
 
-      return { data: data } if json_body['data']
+      return data if json_body['data']
     end
 
     def get_ipam_subnets(group_id, include_id = true)
@@ -126,7 +126,7 @@ module Proxy::Ipam
         data.push(item)
       end
 
-      return { data: data } if json_body['data']
+      return data if json_body['data']
     end
 
     def ip_exists?(ip, subnet_id)

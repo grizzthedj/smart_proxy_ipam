@@ -1,11 +1,10 @@
 require 'net/http'
 # TODO: Refactor & update foreman_ipam plugin with Netbox
-# TODO: Update all API documentation in plugin and foreman core(use Swagger docs for plugin?)
 
 # Module containing helper methods for use by all External IPAM provider implementations
 module IpamHelper
   def get_provider_instance(provider)
-    case provider
+    case provider.downcase
     when 'phpipam'
       client = Proxy::Ipam::PhpipamClient.allocate
     when 'netbox'
@@ -32,7 +31,7 @@ module IpamHelper
       group = provider.get_ipam_group(group_name)
       halt 500, { error: 'Groups are not supported' }.to_json unless provider.groups_supported?
       halt 404, { error: "No group #{group_name} found" }.to_json unless provider.group_exists?(group)
-      subnet = provider.get_ipam_subnet(cidr, group[:data][:id])
+      subnet = provider.get_ipam_subnet(cidr, group[:id])
     end
 
     subnet

@@ -53,7 +53,7 @@ module Proxy::Ipam
           subnet = get_ipam_subnet(provider, group_name, cidr)
 
           halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
-          next_ip = provider.get_next_ip(subnet[:data][:id], mac, cidr, group_name)
+          next_ip = provider.get_next_ip(subnet[:id], mac, cidr, group_name)
           halt 404, { error: errors[:no_free_ips] }.to_json if provider.no_free_ip_found?(next_ip)
           next_ip.to_json
         rescue RuntimeError => e
@@ -243,7 +243,7 @@ module Proxy::Ipam
           group = provider.get_ipam_group(group_name)
 
           halt 404, { error: errors[:no_group] }.to_json unless provider.group_exists?(group)
-          subnets = provider.get_ipam_subnets(group[:data][:id].to_s, false)
+          subnets = provider.get_ipam_subnets(group[:id].to_s, false)
           halt 404, { error: errors[:no_subnets_in_group] }.to_json if provider.no_subnets_found?(subnets)
           subnets.to_json
         rescue RuntimeError => e
@@ -290,7 +290,7 @@ module Proxy::Ipam
           validate_ip_in_cidr!(ip, cidr)
 
           halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
-          ip_exists = provider.ip_exists?(ip, subnet[:data][:id])
+          ip_exists = provider.ip_exists?(ip, subnet[:id])
           halt 200, ip_exists.to_json
         rescue RuntimeError => e
           logger.warn(e.message)
@@ -337,7 +337,7 @@ module Proxy::Ipam
           validate_ip_in_cidr!(ip, cidr)
 
           halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
-          ip_added = provider.add_ip_to_subnet(ip, subnet[:data][:id], 'Address auto added by Foreman')
+          ip_added = provider.add_ip_to_subnet(ip, subnet[:id], 'Address auto added by Foreman')
           halt 500, ip_added.to_json unless ip_added.nil?
           halt 201
         rescue RuntimeError => e
@@ -385,7 +385,7 @@ module Proxy::Ipam
           validate_ip_in_cidr!(ip, cidr)
 
           halt 404, { error: errors[:no_subnet] }.to_json unless provider.subnet_exists?(subnet)
-          ip_deleted = provider.delete_ip_from_subnet(ip, subnet[:data][:id])
+          ip_deleted = provider.delete_ip_from_subnet(ip, subnet[:id])
           halt 500, ip_deleted.to_json unless ip_deleted.nil?
           halt 200
         rescue RuntimeError => e

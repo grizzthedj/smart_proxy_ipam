@@ -65,9 +65,10 @@ module Proxy::Netbox
 
       validate_required_params!([:address, :prefix], params)
       cidr = validate_cidr!(params[:address], params[:prefix])
+      group = params[:group]
 
       begin
-        subnet = provider.get_subnet(cidr)
+        subnet = provider.get_subnet(cidr, group)
       rescue RuntimeError => e
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
@@ -99,7 +100,16 @@ module Proxy::Netbox
     #     {"error": "Unable to connect to External IPAM server"}
     get '/groups' do
       content_type :json
-      return { :error => "Groups are not supported" }.to_json
+
+      begin
+        tenants = provider.get_tenants
+      rescue RuntimeError => e
+        logger.warn(e.message)
+        halt 500, { error: e.message }.to_json
+      end
+
+      status 404 unless tenants
+      tenants.to_json
     end
 
     # Get a group from External IPAM. A group is analagous to a 'section' in phpIPAM, and
@@ -120,7 +130,19 @@ module Proxy::Netbox
     #     {"error": "Unable to connect to External IPAM server"}
     get '/groups/:group' do
       content_type :json
-      return { :error => "Groups are not supported" }.to_json
+
+      validate_required_params!([:group], params)
+      group = params[:group]
+
+      begin
+        tenant = provider.get_tenant(group)
+      rescue RuntimeError => e
+        logger.warn(e.message)
+        halt 500, { error: e.message }.to_json
+      end
+
+      status 404 unless tenant
+      tenant.to_json
     end
 
     # Get a list of subnets for the given External IPAM group.
@@ -142,7 +164,18 @@ module Proxy::Netbox
     #     {"error": "Unable to connect to External IPAM"}
     get '/groups/:group/subnets' do
       content_type :json
-      return { :error => "Groups are not supported" }.to_json
+
+      validate_required_params!([:group], params)
+      group = params[:group]
+
+      begin
+        subnets = provider.get_subnets(group)
+      rescue RuntimeError => e
+        logger.warn(e.message)
+        halt 500, { error: e.message }.to_json
+      end
+
+      subnets.to_json
     end
 
     # Checks whether an IP address has already been reserved in External IPAM.
@@ -172,17 +205,17 @@ module Proxy::Netbox
       ip = validate_ip!(params[:ip])
       cidr = validate_cidr!(params[:address], params[:prefix])
       validate_ip_in_cidr!(ip, cidr)
+      group = params[:group]
 
       begin
-        subnet = provider.get_subnet(cidr)
+        subnet = provider.get_subnet(cidr, group)
+        check_subnet_exists!(subnet)
+        return Net::HTTPFound.new('HTTP/1.1', 200, 'Found').to_json if provider.ip_exists?(ip, subnet['data']['id'])
       rescue RuntimeError => e
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
       end
 
-      check_subnet_exists!(subnet)
-
-      return Net::HTTPFound.new('HTTP/1.1', 200, 'Found').to_json if provider.ip_exists?(ip, subnet['data']['id'])
       return Net::HTTPNotFound.new('HTTP/1.1', 404, 'Not Found').to_json
     end
 
@@ -215,12 +248,13 @@ module Proxy::Netbox
       ip = validate_ip!(params[:ip])
       cidr = validate_cidr!(params[:address], params[:prefix])
       validate_ip_in_cidr!(ip, cidr)
+      group = params[:group]
 
       begin
         subnet = provider.get_subnet(cidr)
         check_subnet_exists!(subnet)
 
-        add_ip = provider.add_ip_to_subnet(ip, params[:prefix], 'Address auto added by Foreman')
+        add_ip = provider.add_ip_to_subnet(ip, params[:prefix], 'Address auto added by Foreman', group)
         halt 500, add_ip.to_json unless add_ip.nil?
       rescue RuntimeError => e
         logger.warn(e.message)
@@ -255,12 +289,13 @@ module Proxy::Netbox
       ip = validate_ip!(params[:ip])
       cidr = validate_cidr!(params[:address], params[:prefix])
       validate_ip_in_cidr!(ip, cidr)
+      group = params[:group]
 
       begin
         subnet = provider.get_subnet(cidr)
         check_subnet_exists!(subnet)
 
-        delete_ip = provider.delete_ip_from_subnet(ip)
+        delete_ip = provider.delete_ip_from_subnet(ip, group)
         halt 500, delete_ip.to_json unless delete_ip.nil?
       rescue RuntimeError => e
         logger.warn(e.message)
@@ -284,7 +319,19 @@ module Proxy::Netbox
     #     {"error": "No subnet 172.55.66.0/29 found in section '<:group>'"}
     get '/group/:group/subnet/:address/:prefix' do
       content_type :json
-      return { :error => "Groups are not supported" }.to_json
+
+      validate_required_params!([:group, :address, :prefix], params)
+      cidr = validate_cidr!(params[:address], params[:prefix])
+      group = params[:group]
+
+      begin
+        subnet = provider.get_subnet(cidr, group)
+      rescue RuntimeError => e
+        logger.warn(e.message)
+        halt 500, { error: e.message }.to_json
+      end
+
+      subnet.to_json
     end
   end
 end

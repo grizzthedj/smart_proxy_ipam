@@ -3,7 +3,7 @@ module NetboxHelper
     err = []
     required_params.each do |param|
       unless params[param.to_sym]
-        err.push errors[param.to_sym]
+        err.push param.to_sym
       end
     end
     halt 400, { error: err }.to_json unless err.empty?

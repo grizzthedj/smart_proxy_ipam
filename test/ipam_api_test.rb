@@ -1,10 +1,6 @@
 require 'test_helper'
-require 'rack/test'
-require 'test/unit'
 
 require 'smart_proxy_ipam/ipam_api'
-
-ENV['RACK_ENV'] = 'test'
 
 class PhpipamApiTest < ::Test::Unit::TestCase
   include Rack::Test::Methods

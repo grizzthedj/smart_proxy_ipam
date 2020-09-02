@@ -6,7 +6,6 @@ require 'concurrent'
 require 'time'
 require 'uri'
 require 'smart_proxy_ipam/ipam'
-require 'smart_proxy_ipam/ipam_main'
 require 'smart_proxy_ipam/phpipam/phpipam_helper'
 
 module Proxy::Phpipam
@@ -19,8 +18,8 @@ module Proxy::Phpipam
     @@ip_cache = nil
     @@timer_task = nil
 
-    def initialize
-      @conf = Proxy::Ipam.get_config[:phpipam]
+    def initialize(conf)
+      @conf = conf
       @api_base = "#{@conf[:url]}/api/#{@conf[:user]}/"
       @token = nil
       @@m = Monitor.new

@@ -34,11 +34,10 @@ module PhpipamHelper
 
   def provider
     @provider ||= begin
-                    phpipam_client = PhpipamClient.new
-                    unless phpipam_client.authenticated?
+                    unless client.authenticated?
                       halt 500, {error: 'Invalid username and password for External IPAM'}.to_json
                     end
-                    phpipam_client
+                    client
                   end
   end
 

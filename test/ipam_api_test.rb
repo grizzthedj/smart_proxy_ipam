@@ -1,5 +1,6 @@
 require 'test_helper'
 
+require 'smart_proxy_ipam/dependency_injection'
 require 'smart_proxy_ipam/ipam_api'
 
 class PhpipamApiTest < ::Test::Unit::TestCase

@@ -1,16 +1,15 @@
-require 'sinatra'
 require 'smart_proxy_ipam/ipam'
-require 'smart_proxy_ipam/ipam_main'
-require 'smart_proxy_ipam/phpipam/phpipam_client'
 require 'smart_proxy_ipam/phpipam/phpipam_helper'
 
-# TODO: Refactor later to handle multiple IPAM providers. For now, it is
-# just phpIPAM that is supported
 module Proxy::Ipam
   class Api < ::Sinatra::Base
+    extend Proxy::Ipam::DependencyInjection
+
     include ::Proxy::Log
     helpers ::Proxy::Helpers
     helpers PhpipamHelper
+
+    inject_attr :externalipam_client, :client
 
     # Gets the next available IP address based on a given subnet
     #

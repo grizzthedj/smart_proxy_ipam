@@ -1,28 +1,28 @@
 module Proxy::Ipam::ApiHelper
   def validate_required_params!(required_params, params)
     err = required_params.select { |param| params[param] }.map { |param| errors[param] }
-    halt 400, {error: err}.to_json unless err.empty?
+    raise Proxy::Validations::Error, err unless err.empty?
   end
 
   def validate_ip!(ip)
     IPAddr.new(ip).to_s
   rescue IPAddr::InvalidAddressError => e
-    halt 400, {error: e.to_s}.to_json
+    raise Proxy::Validations::Error, e.to_s
   end
 
   def validate_cidr!(address, prefix)
     cidr = "#{address}/#{prefix}"
     if IPAddr.new(cidr).to_s != IPAddr.new(address).to_s
-      halt 400, {error: "Network address #{address} should be #{network} with prefix #{prefix}"}.to_json
+      raise Proxy::Validations::Error, "Network address #{address} should be #{network} with prefix #{prefix}"
     end
     cidr
   rescue IPAddr::Error => e
-    halt 400, {error: e.to_s}.to_json
+    raise Proxy::Validations::Error, e.to_s
   end
 
   def validate_ip_in_cidr!(ip, cidr)
     unless IPAddr.new(cidr).include?(IPAddr.new(ip))
-      halt 400, {error: "IP #{ip} is not in #{cidr}"}.to_json
+      raise Proxy::Validations::Error.new, "IP #{ip} is not in #{cidr}"
     end
   end
 

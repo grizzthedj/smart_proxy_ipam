@@ -6,6 +6,7 @@ module Proxy::Ipam
     extend Proxy::Ipam::DependencyInjection
 
     include ::Proxy::Log
+    include ::Proxy::Validations
     helpers ::Proxy::Helpers
     helpers ::Proxy::Ipam::ApiHelper
 
@@ -26,14 +27,15 @@ module Proxy::Ipam
 
       validate_required_params!([:address, :prefix, :mac], params)
       cidr = validate_cidr!(params[:address], params[:prefix])
-
-      mac = params[:mac]
+      mac = validate_mac(params[:mac])
       section_name = params[:group]
 
       subnet = provider.get_subnet(cidr, section_name)
       check_subnet_exists!(subnet)
 
       provider.get_next_ip(subnet['data']['id'], mac, cidr, section_name).to_json
+    rescue Proxy::Validations::Error => e
+      halt 400, {error: e.to_s}.to_json
     end
 
     # Gets the subnet from phpIPAM
@@ -68,6 +70,8 @@ module Proxy::Ipam
 
       status 404 unless subnet
       subnet.to_json
+    rescue Proxy::Validations::Error => e
+      halt 400, {error: e.to_s}
     end
 
     # Get a list of sections from external ipam
@@ -176,6 +180,8 @@ module Proxy::Ipam
       halt 404, {:error => errors[:no_section]}.to_json unless section
 
       provider.get_subnets(section['id'].to_s, false).to_json
+    rescue Proxy::Validations::Error => e
+      halt 400, {error: e.to_s}
     end
 
     # Checks whether an IP address has already been taken in external ipam.
@@ -209,6 +215,8 @@ module Proxy::Ipam
       end
 
       {ip: ip}.to_json
+    rescue Proxy::Validations::Error => e
+      halt 400, {error: e.to_s}
     end
 
     # Adds an IP address to the specified subnet
@@ -243,6 +251,8 @@ module Proxy::Ipam
 
       status 201
       {ip: ip}.to_json
+    rescue Proxy::Validations::Error => e
+      halt 400, {error: e.to_s}
     end
 
     # Deletes IP address from a given subnet
@@ -275,6 +285,8 @@ module Proxy::Ipam
 
       status 204
       nil
+    rescue Proxy::Validations::Error => e
+      halt 400, {error: e.to_s}
     end
 
     # Checks whether a subnet exists in a specific section.
@@ -300,6 +312,8 @@ module Proxy::Ipam
 
       status 404 unless subnet
       subnet.to_json
+    rescue Proxy::Validations::Error => e
+      halt 400, {error: e.to_s}
     end
   end
 end

@@ -12,8 +12,17 @@ class IpamIntegrationTest < Test::Unit::TestCase
   end
 
   def test_features
-    Proxy::DefaultModuleLoader.any_instance.expects(:load_configuration_file).with('externalipam.yml').returns(enabled: true)
-    Proxy::DefaultModuleLoader.any_instance.expects(:load_configuration_file).with('externalipam_phpipam.yml').returns({})
+    plugin_settings = {
+      enabled: true,
+    }
+    provider_settings = {
+      url: 'https://phpipam.example.com',
+      user: 'myuser',
+      password: 'mypassword',
+    }
+
+    Proxy::DefaultModuleLoader.any_instance.expects(:load_configuration_file).with('externalipam.yml').returns(plugin_settings)
+    Proxy::DefaultModuleLoader.any_instance.expects(:load_configuration_file).with('externalipam_phpipam.yml').returns(provider_settings)
 
     get '/features'
 

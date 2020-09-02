@@ -1,6 +1,4 @@
 module Proxy::Ipam
-  class NotFound < RuntimeError; end
-
   class Plugin < ::Proxy::Plugin
     plugin 'externalipam', Proxy::Ipam::VERSION
 

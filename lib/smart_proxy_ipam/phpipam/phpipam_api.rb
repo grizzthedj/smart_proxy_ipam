@@ -28,18 +28,13 @@ module Proxy::Phpipam
       validate_required_params!([:address, :prefix, :mac], params)
       cidr = validate_cidr!(params[:address], params[:prefix])
 
-      begin
-        mac = params[:mac]
-        section_name = params[:group]
+      mac = params[:mac]
+      section_name = params[:group]
 
-        subnet = provider.get_subnet(cidr, section_name)
-        check_subnet_exists!(subnet)
+      subnet = provider.get_subnet(cidr, section_name)
+      check_subnet_exists!(subnet)
 
-        provider.get_next_ip(subnet['data']['id'], mac, cidr, section_name).to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.debug(errors[:no_connection])
-        raise
-      end
+      provider.get_next_ip(subnet['data']['id'], mac, cidr, section_name).to_json
     end
 
     # Gets the subnet from phpIPAM
@@ -70,12 +65,7 @@ module Proxy::Phpipam
       validate_required_params!([:address, :prefix], params)
       cidr = validate_cidr!(params[:address], params[:prefix])
 
-      subnet = begin
-                 provider.get_subnet(cidr)
-               rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-                 logger.debug(errors[:no_connection])
-                 raise
-               end
+      subnet = provider.get_subnet(cidr)
 
       status 404 unless subnet
       subnet.to_json
@@ -91,20 +81,13 @@ module Proxy::Phpipam
     #      "permissions":"[]","strictMode":"1","subnetOrdering":"default","order":null,
     #      "editDate":"2019-04-19 21:49:55","showVLAN":"1","showVRF":"1","showSupernetOnly":"1","DNS":null}]
     #   ]
-    #   Response if :error =>
-    #     {"error":"Unable to connect to phpIPAM server"}
     get '/groups' do
       content_type :json
 
-      begin
-        sections = provider.get_sections
-        return {:data => []}.to_json unless sections
+      sections = provider.get_sections
+      return {:data => []}.to_json unless sections
 
-        sections
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.debug(errors[:no_connection])
-        raise
-      end
+      sections
     end
 
     # Get a single section from external ipam
@@ -125,14 +108,9 @@ module Proxy::Phpipam
 
       validate_required_params!([:group], params)
 
-      begin
-        section = provider.get_section(params[:group])
-        status 404 unless section
-        section.to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.debug(errors[:no_connection])
-        raise
-      end
+      section = provider.get_section(params[:group])
+      status 404 unless section
+      section.to_json
     end
 
     # Get a list of subnets for given external ipam section/group
@@ -195,15 +173,10 @@ module Proxy::Phpipam
 
       validate_required_params!([:group], params)
 
-      begin
-        section = provider.get_section(params[:group])
-        halt 404, {:error => errors[:no_section]}.to_json unless section
+      section = provider.get_section(params[:group])
+      halt 404, {:error => errors[:no_section]}.to_json unless section
 
-        provider.get_subnets(section['id'].to_s, false).to_json
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.debug(errors[:no_connection])
-        raise
-      end
+      provider.get_subnets(section['id'].to_s, false).to_json
     end
 
     # Checks whether an IP address has already been taken in external ipam.
@@ -227,18 +200,13 @@ module Proxy::Phpipam
       cidr = validate_cidr!(params[:address], params[:prefix])
       validate_ip_in_cidr!(ip, cidr)
 
-      begin
-        section_name = params[:group]
+      section_name = params[:group]
 
-        subnet = provider.get_subnet(cidr, section_name)
-        check_subnet_exists!(subnet)
+      subnet = provider.get_subnet(cidr, section_name)
+      check_subnet_exists!(subnet)
 
-        unless provider.ip_exists?(ip, subnet['data']['id'])
-          halt 404, {error: "IP #{ip} was not found in subnet #{cidr}"}.to_json
-        end
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.debug(errors[:no_connection])
-        raise
+      unless provider.ip_exists?(ip, subnet['data']['id'])
+        halt 404, {error: "IP #{ip} was not found in subnet #{cidr}"}.to_json
       end
 
       {ip: ip}.to_json
@@ -266,18 +234,13 @@ module Proxy::Phpipam
       cidr = validate_cidr!(params[:address], params[:prefix])
       validate_ip_in_cidr!(ip, cidr)
 
-      begin
-        section_name = params[:group]
+      section_name = params[:group]
 
-        subnet = provider.get_subnet(cidr, section_name)
-        check_subnet_exists!(subnet)
+      subnet = provider.get_subnet(cidr, section_name)
+      check_subnet_exists!(subnet)
 
-        add_ip = provider.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
-        halt 500, add_ip.to_json if add_ip
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.debug(errors[:no_connection])
-        raise
-      end
+      add_ip = provider.add_ip_to_subnet(ip, subnet['data']['id'], 'Address auto added by Foreman')
+      halt 500, add_ip.to_json if add_ip
 
       status 201
       {ip: ip}.to_json
@@ -303,18 +266,13 @@ module Proxy::Phpipam
       cidr = validate_cidr!(params[:address], params[:prefix])
       validate_ip_in_cidr!(ip, cidr)
 
-      begin
-        section_name = params[:group]
+      section_name = params[:group]
 
-        subnet = provider.get_subnet(cidr, section_name)
-        check_subnet_exists!(subnet)
+      subnet = provider.get_subnet(cidr, section_name)
+      check_subnet_exists!(subnet)
 
-        delete_ip = provider.delete_ip_from_subnet(ip, subnet['data']['id'])
-        halt 500, delete_ip.to_json if delete_ip
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.debug(errors[:no_connection])
-        raise
-      end
+      delete_ip = provider.delete_ip_from_subnet(ip, subnet['data']['id'])
+      halt 500, delete_ip.to_json if delete_ip
 
       status 204
       nil
@@ -339,12 +297,7 @@ module Proxy::Phpipam
       validate_required_params!([:address, :prefix, :group], params)
       cidr = validate_cidr!(params[:address], params[:prefix])
 
-      subnet = begin
-                 provider.get_subnet_by_section(cidr, params[:group])
-               rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-                 logger.debug(errors[:no_connection])
-                 raise
-               end
+      subnet = provider.get_subnet_by_section(cidr, params[:group])
 
       status 404 unless subnet
       subnet.to_json

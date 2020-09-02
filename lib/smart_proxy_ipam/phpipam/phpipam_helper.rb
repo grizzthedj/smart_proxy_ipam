@@ -68,7 +68,6 @@ module PhpipamHelper
       :mac => "A 'mac' address must be provided(e.g. 00:0a:95:9d:68:10)",
       :ip => "Missing 'ip' parameter. An IPv4 or IPv6 address must be provided(e.g. IPv4: 100.10.10.22, IPv6: 2001:db8:abcd:12::3)",
       :section_name => "A 'section_name' must be provided",
-      :no_connection => "Unable to connect to External IPAM server",
       :no_section => "Group not found in External IPAM"
     }
   end

@@ -1,4 +1,4 @@
-module PhpipamHelper
+module Proxy::Ipam::ApiHelper
   def validate_required_params!(required_params, params)
     err = required_params.select { |param| params[param] }.map { |param| errors[param] }
     halt 400, {error: err}.to_json unless err.empty?

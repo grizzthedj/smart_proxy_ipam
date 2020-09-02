@@ -1,5 +1,5 @@
 require 'smart_proxy_ipam/ipam'
-require 'smart_proxy_ipam/phpipam/phpipam_helper'
+require 'smart_proxy_ipam/api_helper'
 
 module Proxy::Ipam
   class Api < ::Sinatra::Base
@@ -7,7 +7,7 @@ module Proxy::Ipam
 
     include ::Proxy::Log
     helpers ::Proxy::Helpers
-    helpers PhpipamHelper
+    helpers ::Proxy::Ipam::ApiHelper
 
     inject_attr :externalipam_client, :client
 

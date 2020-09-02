@@ -2,7 +2,7 @@ require 'test_helper'
 require 'rack/test'
 require 'test/unit'
 
-require 'smart_proxy_ipam/phpipam/phpipam_api'
+require 'smart_proxy_ipam/ipam_api'
 
 ENV['RACK_ENV'] = 'test'
 
@@ -10,7 +10,7 @@ class PhpipamApiTest < ::Test::Unit::TestCase
   include Rack::Test::Methods
 
   def app
-    Proxy::Phpipam::Api.new
+    Proxy::Ipam::Api.new
   end
 
   def test_next_ip_should_return_error_when_parameter_missing

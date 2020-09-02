@@ -6,7 +6,7 @@ require 'smart_proxy_ipam/phpipam/phpipam_helper'
 
 # TODO: Refactor later to handle multiple IPAM providers. For now, it is
 # just phpIPAM that is supported
-module Proxy::Phpipam
+module Proxy::Ipam
   class Api < ::Sinatra::Base
     include ::Proxy::Log
     helpers ::Proxy::Helpers

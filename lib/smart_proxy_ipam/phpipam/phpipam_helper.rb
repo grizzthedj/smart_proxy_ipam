@@ -42,17 +42,6 @@ module PhpipamHelper
                   end
   end
 
-  # Returns an array of hashes with only the fields given in the fields param
-  def filter_fields(json_body, fields)
-    data = []
-    json_body['data'].each do |subnet|
-      item = {}
-      fields.each do |field| item[field.to_sym] = subnet[field.to_s] end
-      data.push(item)
-    end if json_body && json_body['data']
-    data
-  end
-
   def errors
     {
       :cidr => "A 'cidr' parameter for the subnet must be provided(e.g. IPv4: 100.10.10.0/24, IPv6: 2001:db8:abcd:12::/124)",

@@ -339,4 +339,11 @@ module Proxy::Phpipam
       @token = response.dig('data', 'token')
     end
   end
+
+  # Returns an array of hashes with only the fields given in the fields param
+  def filter_fields(json_body, fields)
+    return [] unless json_body && json_body['data']
+
+    json_body['data'].map { |subnet| subnet.slice(*fields) }
+  end
 end

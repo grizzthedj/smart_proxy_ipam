@@ -53,15 +53,6 @@ module PhpipamHelper
     data
   end
 
-  # Returns a hash with only the fields given in the fields param
-  def filter_hash(hash, fields)
-    new_hash = {}
-    fields.each do |field|
-      new_hash[field.to_sym] = hash[field.to_s] if hash[field.to_s]
-    end
-    new_hash
-  end
-
   def errors
     {
       :cidr => "A 'cidr' parameter for the subnet must be provided(e.g. IPv4: 100.10.10.0/24, IPv6: 2001:db8:abcd:12::/124)",

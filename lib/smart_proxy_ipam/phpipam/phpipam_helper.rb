@@ -2,7 +2,7 @@ module PhpipamHelper
   def validate_required_params(required_params, params)
     err = []
     required_params.each do |param|
-      if not params[param.to_sym] 
+      if not params[param.to_sym]
         err.push errors[param.to_sym]
       end
     end
@@ -32,7 +32,7 @@ module PhpipamHelper
   def auth_error
     {:code => 401, :error => "Invalid username and password for External IPAM"}.to_json
   end
-  
+
   # Returns an array of hashes with only the fields given in the fields param
   def filter_fields(json_body, fields)
     data = []
@@ -45,9 +45,9 @@ module PhpipamHelper
   end
 
   # Returns a hash with only the fields given in the fields param
-  def filter_hash(hash, fields) 
+  def filter_hash(hash, fields)
     new_hash = {}
-    fields.each do |field| 
+    fields.each do |field|
       new_hash[field.to_sym] = hash[field.to_s] if hash[field.to_s]
     end
     new_hash

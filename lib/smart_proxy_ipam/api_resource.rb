@@ -10,9 +10,8 @@ class ApiResource
   include IpamHelper
 
   def initialize(params = {})
-    @config = params[:config]
     @api_base = params[:api_base]
-    @token = nil
+    @token = params[:token]
   end
 
   def get(path)
@@ -51,23 +50,5 @@ class ApiResource
     Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') do |http|
       http.request(request)
     end
-  end
-
-  def authenticate(path)
-    auth_uri = URI(@api_base + path)
-    request = Net::HTTP::Post.new(auth_uri)
-    request.basic_auth @config[:user], @config[:password]
-
-    response = Net::HTTP.start(auth_uri.hostname, auth_uri.port, use_ssl: auth_uri.scheme == 'https') do |http|
-      http.request(request)
-    end
-
-    response = JSON.parse(response.body)
-    logger.warn(response['message']) if response['message']
-    @token = response.dig('data', 'token')
-  end
-
-  def authenticated?
-    !@token.nil?
   end
 end

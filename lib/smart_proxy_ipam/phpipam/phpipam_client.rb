@@ -23,11 +23,11 @@ module Proxy::Ipam
 
     def initialize
       provider = :phpipam
-      config = Proxy::Ipam.get_config[provider]
-      raise 'The configuration for phpipam is not present in externalipam.yml' unless config
-      api_base = "#{config[:url]}/api/#{config[:user]}/"
-      @api_resource = ApiResource.new(api_base: api_base, config: config)
-      @api_resource.authenticate('/user/')
+      @config = Proxy::Ipam.get_config[provider]
+      raise 'The configuration for phpipam is not present in externalipam.yml' unless @config
+      @api_base = "#{@config[:url]}/api/#{@config[:user]}/"
+      @token = authenticate('/user/')
+      @api_resource = ApiResource.new(api_base: @api_base, token: @token)
       @ip_cache = IpCache.new(provider: provider)
     end
 
@@ -180,10 +180,6 @@ module Proxy::Ipam
       next_ip
     end
 
-    def authenticated?
-      @api_resource.authenticated?
-    end
-
     def subnet_exists?(subnet)
       !(subnet[:message] && subnet[:message].downcase == 'no subnet found')
     end
@@ -208,7 +204,25 @@ module Proxy::Ipam
       true
     end
 
+    def authenticated?
+      !@token.nil?
+    end
+
     private
+
+    def authenticate(path)
+      auth_uri = URI(@api_base + path)
+      request = Net::HTTP::Post.new(auth_uri)
+      request.basic_auth @config[:user], @config[:password]
+  
+      response = Net::HTTP.start(auth_uri.hostname, auth_uri.port, use_ssl: auth_uri.scheme == 'https') do |http|
+        http.request(request)
+      end
+  
+      response = JSON.parse(response.body)
+      logger.warn(response['message']) if response['message']
+      response.dig('data', 'token')
+    end
 
     # Called when next available IP from external IPAM has been cached by another user/host, but
     # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and

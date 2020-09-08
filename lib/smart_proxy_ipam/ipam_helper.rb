@@ -4,17 +4,16 @@ require 'net/http'
 # Module containing helper methods for use by all External IPAM provider implementations
 module IpamHelper
   def get_provider_instance(provider)
-    case provider.downcase
+    # Set phpIPAM as default provider, when provider is not present, to not break existing implementations
+    ipam_provider = provider.nil? ? 'phpipam' : provider
+
+    case ipam_provider.downcase
     when 'phpipam'
       client = Proxy::Ipam::PhpipamClient.allocate
     when 'netbox'
       client = Proxy::Ipam::NetboxClient.allocate
     else
-      # Setting phpIPAM as default provider, when provider not specified,
-      # not to break existing implementations
-      client = Proxy::Ipam::PhpipamClient.allocate
-      # After some time, raise an exception for unknown provider
-      # halt 500, { error: 'Unknown IPAM provider' }.to_json
+      halt 500, { error: 'Unknown IPAM provider' }.to_json
     end
 
     client.send :initialize

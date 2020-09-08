@@ -10,9 +10,14 @@ require 'smart_proxy_ipam/ipam_helper'
 module Proxy::Ipam
   # Generic API for External IPAM interactions
   class Api < ::Sinatra::Base
+    extend Proxy::DHCP::DependencyInjection
+    
     include ::Proxy::Log
     helpers ::Proxy::Helpers
     helpers IpamHelper
+    # authorize_with_trusted_hosts
+    # authorize_with_ssl_client
+    inject_attr :ipam_provider, :server
 
     # Gets the next available IP address based on a given External IPAM subnet
     #

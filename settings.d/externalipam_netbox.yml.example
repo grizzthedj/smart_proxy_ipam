@@ -1,0 +1,3 @@
+---
+:url: 'https://netbox.example.com'
+:token: 'netbox_api_token'

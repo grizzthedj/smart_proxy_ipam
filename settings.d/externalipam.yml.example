@@ -3,6 +3,9 @@
 
 :externalipam:
   :phpipam:
-    :url: 'http://phpipam.example.com'
+    :url: 'https://phpipam.example.com'
     :user: 'phpipam_api_user'
     :password: 'phpipam_password'
+  :netbox:
+    :url: 'https://netbox.example.com'
+    :token: 'netbox_api_token'

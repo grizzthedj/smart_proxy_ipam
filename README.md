@@ -2,11 +2,15 @@
 
 Foreman Smart Proxy plugin for IPAM integration with various IPAM providers.
 
-Currently supported Providers: 
-1. [phpIPAM](https://phpipam.net/). 
+Currently supported Providers:
+1. [phpIPAM](https://phpipam.net/).
+2. [NetBox](https://github.com/netbox-community/netbox).
 
+
+### phpIPAM
 Provides a basic Dashboard for viewing phpIPAM sections, subnets. Also supports obtaining of the next available IPv4 address for a given subnet(via [IPAM Smart Proxy Plugin](https://github.com/grizzthedj/smart_proxy_ipam)).
-
+### NetBox
+Supports obtaining and assinging IP adresses in subnets. Groups are currently not supported.
 
 ## Installation
 
@@ -18,11 +22,15 @@ for how to install Foreman plugins
 Once plugin is installed, you can use phpIPAM to get the next available IP address for a subnet:
 
 1. Create a subnet in Foreman of IPAM type "External IPAM". Click on the `Proxy` tab and associate the subnet with a Smart Proxy that has the `externalipam` feature enabled. _NOTE: This subnet must actually exist in phpIPAM. There is no integration with subnet creation at this time._
-2. Create a host in Foreman. When adding/editing interfaces, select the above created subnet, and the next available IP in the selected subnet will be pulled from phpIPAM, and displayed in the IPv4/IPv6 address field. 
+2. Create a host in Foreman. When adding/editing interfaces, select the above created subnet, and the next available IP in the selected subnet will be pulled from phpIPAM, and displayed in the IPv4/IPv6 address field.
+
+### NetBox
+1. obtain a api token via a user profile in Netbox
+2. add the token and the url to your NetBox instance to the configuration in `/etc/foreman-proxy/settings.d/externalipam.yml`
 
 ## Local development
 
-1. Clone the Foreman repo 
+1. Clone the Foreman repo
 ```
 git clone https://github.com/theforeman/foreman.git
 ```
@@ -43,7 +51,7 @@ git clone https://github.com/<GITHUB_USER>/smart_proxy_ipam
 ```
 gem 'foreman_ipam', :path => '/path/to/foreman_ipam'
 ```
-5. From Foreman root directory run 
+5. From Foreman root directory run
 ```
 bundle install
 bundle exec rails db:migrate
@@ -55,7 +63,7 @@ bundle exec foreman start
 gem 'smart_proxy_ipam', :path => '/path/to/smart_proxy_ipam'
 ```
 7. Copy `config/settings.d/externalipam.yml.example` to `config/settings.d/externalipam.yml` and replace values with your phpIPAM URL and credentials.
-8. From Smart Proxy root directory run ... 
+8. From Smart Proxy root directory run ...
 ```
 bundle install
 bundle exec smart-proxy start
@@ -66,7 +74,7 @@ bundle exec smart-proxy start
 12. Create a Subnet(IPv4 or IPv6), and associate the subnet with the `External IPAM` proxy. Subnet must exist in phpIPAM.
 13. Create a Host, and select an External IPAM Subnet to obtain the next available IP from phpIPAM
 NOTE: For IPv6 subnets only, if the subnet has no addresses reserved(i.e. empty), the first address returned is actually the network address(e.g. `fd13:6d20:29dc:cf27::`), which is not a valid IP. This is a bug within phpIPAM itself
- 
+
 ## Contributing
 
 Fork and send a Pull Request. Thanks!

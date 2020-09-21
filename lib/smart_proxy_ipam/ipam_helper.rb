@@ -1,27 +1,6 @@
-require 'net/http'
-# TODO: Refactor & update foreman_ipam plugin with Netbox
-
 # Module containing helper methods for use by all External IPAM provider implementations
-module IpamHelper
-  def get_provider_instance(provider)
-    # Set phpIPAM as default provider, when provider is not present, to not break existing implementations
-    ipam_provider = provider.nil? ? 'phpipam' : provider
-
-    case ipam_provider.downcase
-    when 'phpipam'
-      client = Proxy::Ipam::PhpipamClient.allocate
-    when 'netbox'
-      client = Proxy::Ipam::NetboxClient.allocate
-    else
-      halt 500, { error: 'Unknown IPAM provider' }.to_json
-    end
-
-    client.send :initialize
-    halt 500, { error: 'Invalid credentials for External IPAM' }.to_json unless client.authenticated?
-    client
-  end
-
-  def get_ipam_subnet(provider, group_name, cidr)
+module Proxy::Ipam::IpamHelper
+  def get_ipam_subnet(group_name, cidr)
     subnet = nil
 
     if group_name.nil? || group_name.empty?
@@ -29,7 +8,7 @@ module IpamHelper
     else
       group = provider.get_ipam_group(group_name)
       halt 500, { error: 'Groups are not supported' }.to_json unless provider.groups_supported?
-      halt 404, { error: "No group #{group_name} found" }.to_json unless provider.group_exists?(group)
+      halt 404, { error: "No group #{group_name} found" }.to_json if group.nil?
       subnet = provider.get_ipam_subnet(cidr, group[:id])
     end
 
@@ -46,40 +25,53 @@ module IpamHelper
     network.include?(IPAddr.new(ip)) && network.to_range.last != ip
   end
 
-  def validate_presence_of!(required_params, params)
+  def validate_required_params!(required_params, params)
     err = []
     required_params.each do |param|
       unless params[param.to_sym]
         err.push errors[param.to_sym]
       end
     end
-    halt 400, { error: err }.to_json unless err.empty?
+    raise Proxy::Validations::Error, err unless err.empty?
   end
 
   def validate_ip!(ip)
     IPAddr.new(ip).to_s
-  rescue IPAddr::InvalidAddressError
-    nil
+  rescue IPAddr::InvalidAddressError => e
+    raise Proxy::Validations::Error, e.to_s
   end
 
   def validate_cidr!(address, prefix)
     cidr = "#{address}/#{prefix}"
-    network = IPAddr.new(cidr).to_s
-    return nil if network != IPAddr.new(address).to_s
+    if IPAddr.new(cidr).to_s != IPAddr.new(address).to_s
+      raise Proxy::Validations::Error, "Network address #{address} should be #{network} with prefix #{prefix}"
+    end
     cidr
-  rescue IPAddr::Error
-    nil
+  rescue IPAddr::Error => e
+    raise Proxy::Validations::Error, e.to_s
   end
 
   def validate_ip_in_cidr!(ip, cidr)
-    halt 400, { error: "IP #{ip} is not in subnet #{cidr}" }.to_json unless IPAddr.new(cidr).include?(IPAddr.new(ip))
+    unless IPAddr.new(cidr).include?(IPAddr.new(ip))
+      raise Proxy::Validations::Error.new, "IP #{ip} is not in #{cidr}"
+    end
   end
 
   def validate_mac!(mac)
     unless mac.match(/^([0-9a-fA-F]{2}[:]){5}[0-9a-fA-F]{2}$/i)
-      return nil
+      raise Proxy::Validations::Error.new, "Mac address is not valid"
     end
     mac
+  end
+
+  def provider
+    @provider ||= 
+      begin
+        unless client.authenticated?
+          halt 500, {error: 'Invalid credentials for External IPAM'}.to_json
+        end
+        client
+      end
   end
 
   def get_request_ip(params)
@@ -100,9 +92,9 @@ module IpamHelper
     mac
   end
 
-  def get_request_group(params, provider)
+  def get_request_group(params)
     group = params[:group] ? URI.escape(params[:group]) : nil
-    halt 500, { error: errors[:groups_not_supported] }.to_json if !provider.groups_supported? && group
+    halt 500, { error: errors[:groups_not_supported] }.to_json if group && !provider.groups_supported?
     group
   end
 

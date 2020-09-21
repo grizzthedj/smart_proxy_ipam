@@ -7,7 +7,7 @@ ENV['RACK_ENV'] = 'test'
 
 class IpamHelperTest < ::Test::Unit::TestCase
   include Rack::Test::Methods
-  include IpamHelper
+  include Proxy::Ipam::IpamHelper
 
   def app
     Proxy::Ipam::Api.new

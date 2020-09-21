@@ -7,7 +7,7 @@ require 'smart_proxy_ipam/ipam_helper'
 # Class to handle authentication and HTTP transactions with External IPAM providers
 class ApiResource
   include ::Proxy::Log
-  include IpamHelper
+  include Proxy::Ipam::IpamHelper
 
   def initialize(params = {})
     @api_base = params[:api_base]

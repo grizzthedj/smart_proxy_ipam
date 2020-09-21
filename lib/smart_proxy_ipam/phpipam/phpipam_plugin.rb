@@ -1,17 +1,17 @@
-module ::Proxy::Phpipam
+module Proxy::Phpipam
   class Plugin < ::Proxy::Provider
-    plugin :externalipam_phpipam, ::Proxy::Ipam::VERSION
+    plugin :externalipam_phpipam, Proxy::Ipam::VERSION
 
-    requires :externalipam, ::Proxy::Ipam::VERSION
+    requires :externalipam, Proxy::Ipam::VERSION
     validate :url, url: true
     validate_presence :user, :password
 
-    def load_classes
-      require 'smart_proxy_ipam/phpipam/phpipam_client.rb'
-    end
+    load_classes(proc do
+      require 'smart_proxy_ipam/phpipam/phpipam_client'
+    end)
 
-    def load_dependency_injection_wirings(container_instance, settings)
+    load_dependency_injection_wirings(proc do |container_instance, settings|
       container_instance.dependency :externalipam_client, -> { ::Proxy::Phpipam::PhpipamClient.new(settings) }
-    end
+    end)
   end
 end

@@ -7,28 +7,25 @@ require 'time'
 require 'uri'
 require 'sinatra'
 require 'smart_proxy_ipam/ipam'
-require 'smart_proxy_ipam/ipam_main'
 require 'smart_proxy_ipam/ipam_helper'
 require 'smart_proxy_ipam/api_resource'
 require 'smart_proxy_ipam/ip_cache'
 
-module Proxy::Ipam
+module Proxy::Phpipam
   # Implementation class for External IPAM provider phpIPAM
   class PhpipamClient
     include Proxy::Log
-    include IpamHelper
+    include Proxy::Ipam::IpamHelper
 
     @ip_cache = nil
     MAX_RETRIES = 5
 
-    def initialize
-      provider = :phpipam
-      @config = Proxy::Ipam.get_config[provider]
-      raise 'The configuration for phpipam is not present in externalipam.yml' unless @config
-      @api_base = "#{@config[:url]}/api/#{@config[:user]}/"
+    def initialize(conf)
+      @conf = conf
+      @api_base = "#{@conf[:url]}/api/#{@conf[:user]}/"
       @token = authenticate('/user/')
       @api_resource = ApiResource.new(api_base: @api_base, token: @token)
-      @ip_cache = IpCache.new(provider: provider)
+      @ip_cache = IpCache.new(provider: "phpipam")
     end
 
     def get_ipam_subnet(cidr, group_id = nil)
@@ -41,6 +38,7 @@ module Proxy::Ipam
 
     def get_ipam_subnet_by_group(cidr, group_id, include_id = true)
       subnets = get_ipam_subnets(group_id, include_id)
+      return nil if subnets.nil?
       subnet_id = nil
 
       subnets.each do |subnet|
@@ -48,8 +46,7 @@ module Proxy::Ipam
         subnet_id = subnet[:id] if subnet_cidr == cidr
       end
 
-      return { message: 'No subnet found' } if subnet_id.nil?
-
+      return nil if subnet_id.nil?
       response = @api_resource.get("subnets/#{subnet_id}/")
       json_body = JSON.parse(response.body)
 
@@ -64,10 +61,9 @@ module Proxy::Ipam
     end
 
     def get_ipam_subnet_by_cidr(cidr)
-      response = @api_resource.get("subnets/cidr/#{cidr}")
-      json_body = JSON.parse(response.body)
-
-      return { message: 'No subnet found' } if json_body['data'].nil?
+      subnet = @api_resource.get("subnets/cidr/#{cidr}")
+      json_body = JSON.parse(subnet.body)
+      return nil if json_body['data'].nil?
 
       data = {
         id: json_body['data'][0]['id'],
@@ -80,9 +76,10 @@ module Proxy::Ipam
     end
 
     def get_ipam_group(group_name)
-      response = @api_resource.get("sections/#{group_name}/")
-      json_body = JSON.parse(response.body)
-      return { message: json_body['message'] } if json_body['message']
+      return nil if group_name.nil?
+      group = @api_resource.get("sections/#{group_name}/")
+      json_body = JSON.parse(group.body)
+      return nil if json_body['data'].nil?
 
       data = {
         id: json_body['data']['id'],
@@ -94,9 +91,9 @@ module Proxy::Ipam
     end
 
     def get_ipam_groups
-      response = @api_resource.get('sections/')
-      json_body = JSON.parse(response.body)
-      return { message: json_body['message'] } if json_body['message']
+      groups = @api_resource.get('sections/')
+      json_body = JSON.parse(groups.body)
+      return nil if json_body['data'].nil?
 
       data = []
       json_body['data'].each do |group|
@@ -111,9 +108,9 @@ module Proxy::Ipam
     end
 
     def get_ipam_subnets(group_id, include_id = true)
-      response = @api_resource.get("sections/#{group_id}/subnets/")
-      json_body = JSON.parse(response.body)
-      return { message: json_body['message'] } if json_body['message']
+      subnets = @api_resource.get("sections/#{group_id}/subnets/")
+      json_body = JSON.parse(subnets.body)
+      return nil if json_body['data'].nil?
 
       data = []
       json_body['data'].each do |group|
@@ -130,22 +127,22 @@ module Proxy::Ipam
     end
 
     def ip_exists?(ip, subnet_id)
-      response = @api_resource.get("subnets/#{subnet_id}/addresses/#{ip}/")
-      json_body = JSON.parse(response.body)
+      ip = @api_resource.get("subnets/#{subnet_id}/addresses/#{ip}/")
+      json_body = JSON.parse(ip.body)
       json_body['success']
     end
 
-    def add_ip_to_subnet(ip, subnet_id, desc)
-      data = { subnetId: subnet_id, ip: ip, description: desc }
-      response = @api_resource.post('addresses/', data)
-      json_body = JSON.parse(response.body)
+    def add_ip_to_subnet(ip, subnet_id)
+      data = { subnetId: subnet_id, ip: ip, description: 'Address auto added by Foreman' }
+      subnet = @api_resource.post('addresses/', data)
+      json_body = JSON.parse(subnet.body)
       return nil if json_body['code'] == 201
       { error: 'Unable to add IP to External IPAM' }
     end
 
     def delete_ip_from_subnet(ip, subnet_id)
-      response = @api_resource.delete("addresses/#{ip}/#{subnet_id}/")
-      json_body = JSON.parse(response.body)
+      subnet = @api_resource.delete("addresses/#{ip}/#{subnet_id}/")
+      json_body = JSON.parse(subnet.body)
       return nil if json_body['success']
       { error: 'Unable to delete IP from External IPAM' }
     end
@@ -177,27 +174,13 @@ module Proxy::Ipam
         return { error: "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{@ip_cache.get_cleanup_interval} seconds)." } unless usable_ip(next_ip, cidr)
       end
 
+      return nil if no_free_ip_found?(next_ip)
+
       next_ip
     end
 
-    def subnet_exists?(subnet)
-      !(subnet[:message] && subnet[:message].downcase == 'no subnet found')
-    end
-
     def no_free_ip_found?(ip)
-      ip.is_a?(Hash) && ip[:message] && ip[:message].downcase == 'no free addresses found'
-    end
-
-    def group_exists?(group)
-      !(group && group[:message] && group[:message].downcase == 'not found')
-    end
-
-    def no_groups_found?(groups)
-      groups[:message] && groups[:message].downcase == 'no sections available'
-    end
-
-    def no_subnets_found?(subnets)
-      subnets[:message] && subnets[:message].downcase == 'no subnets found'
+      ip.is_a?(Hash) && ip['message'] && ip['message'].downcase == 'no free addresses found'
     end
 
     def groups_supported?
@@ -213,7 +196,7 @@ module Proxy::Ipam
     def authenticate(path)
       auth_uri = URI(@api_base + path)
       request = Net::HTTP::Post.new(auth_uri)
-      request.basic_auth @config[:user], @config[:password]
+      request.basic_auth @conf[:user], @conf[:password]
   
       response = Net::HTTP.start(auth_uri.hostname, auth_uri.port, use_ssl: auth_uri.scheme == 'https') do |http|
         http.request(request)

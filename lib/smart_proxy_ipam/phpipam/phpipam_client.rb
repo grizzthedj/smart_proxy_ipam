@@ -6,12 +6,10 @@ require 'concurrent'
 require 'time'
 require 'uri'
 require 'smart_proxy_ipam/ipam'
-require 'smart_proxy_ipam/phpipam/phpipam_helper'
 
 module Proxy::Phpipam
   class PhpipamClient
     include Proxy::Log
-    include PhpipamHelper
 
     MAX_RETRIES = 5
     DEFAULT_CLEANUP_INTERVAL = 60  # 2 mins

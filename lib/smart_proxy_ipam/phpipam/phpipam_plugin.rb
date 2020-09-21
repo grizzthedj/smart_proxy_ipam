@@ -7,7 +7,7 @@ module ::Proxy::Phpipam
     validate_presence :user, :password
 
     def load_classes
-      require 'smart_proxy_ipam/phpipam/phpipam_client.rb'
+      require 'smart_proxy_ipam/phpipam/phpipam_client'
     end
 
     def load_dependency_injection_wirings(container_instance, settings)

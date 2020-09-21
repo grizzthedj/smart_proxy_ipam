@@ -1,3 +1,5 @@
+require 'proxy/validations'
+
 require 'smart_proxy_ipam/ipam'
 require 'smart_proxy_ipam/api_helper'
 

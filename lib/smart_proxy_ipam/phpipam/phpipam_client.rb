@@ -188,10 +188,12 @@ module Proxy::Phpipam
     end
 
     def authenticated?
-      !@token.nil?
+      @api_resource.authenticated?
     end
 
-    private
+    def subnet_exists?(subnet)
+      !(subnet[:message] && subnet[:message].downcase == 'no subnet found')
+    end
 
     def authenticate(path)
       auth_uri = URI(@api_base + path)
@@ -206,6 +208,8 @@ module Proxy::Phpipam
       logger.warn(response['message']) if response['message']
       response.dig('data', 'token')
     end
+
+    private
 
     # Called when next available IP from external IPAM has been cached by another user/host, but
     # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and

@@ -1,9 +1,5 @@
 require 'proxy/validations'
 
-# require 'sinatra'
-# require 'net/http'
-# require 'json'
-
 require 'smart_proxy_ipam/ipam'
 require 'smart_proxy_ipam/ipam_helper'
 require 'smart_proxy_ipam/dependency_injection'

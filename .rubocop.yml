@@ -1,5 +1,5 @@
 AllCops:
-  TargetRubyVersion: 2.6.3
+  TargetRubyVersion: 2.5
 
 # === Style rules =============
 Style/FrozenStringLiteralComment:
@@ -22,6 +22,9 @@ Style/SymbolArray:
   EnforcedStyle: brackets
 
 Style/Documentation:
+  Enabled: false
+
+Style/GuardClause:
   Enabled: false
 
 # === Lint rules

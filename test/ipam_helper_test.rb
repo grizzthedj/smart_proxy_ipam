@@ -21,8 +21,9 @@ class IpamHelperTest < ::Test::Unit::TestCase
 
   def test_validate_mac_should_return_nil_for_invalid_mac_address
     bad_mac = 'this is not a mac address'
-    validated_mac = validate_mac!(bad_mac)
-    assert validated_mac.nil?
+    assert_raise Proxy::Validations::Error do
+      validate_mac!(bad_mac)
+    end
   end
 
   def test_validate_ip_should_return_valid_ip_address
@@ -33,8 +34,9 @@ class IpamHelperTest < ::Test::Unit::TestCase
 
   def test_validate_ip_should_return_nil_for_invalid_ip_address
     bad_ip = 'this is not an ip address'
-    validated_ip = validate_ip!(bad_ip)
-    assert validated_ip.nil?
+    assert_raise Proxy::Validations::Error do
+      validate_ip!(bad_ip)
+    end
   end
 
   def test_validate_cidr_should_return_valid_cidr
@@ -47,7 +49,8 @@ class IpamHelperTest < ::Test::Unit::TestCase
   def test_validate_cidr_should_return_nil_for_invalid_cidr
     address = 'bad address'
     prefix = 'bad prefix'
-    validated_cidr = validate_cidr!(address, prefix)
-    assert validated_cidr.nil?
+    assert_raise Proxy::Validations::Error do
+      validate_cidr!(address, prefix)
+    end
   end
 end

@@ -17,12 +17,12 @@ class IpamIntegrationTest < ::Test::Unit::TestCase
 
   def test_features
     plugin_settings = {
-      enabled: true,
+      enabled: true
     }
     provider_settings = {
       url: 'https://phpipam.example.com',
       user: 'myuser',
-      password: 'mypassword',
+      password: 'mypassword'
     }
 
     Proxy::DefaultModuleLoader.any_instance.expects(:load_configuration_file).with('externalipam.yml').returns(plugin_settings)

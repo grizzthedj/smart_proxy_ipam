@@ -11,7 +11,7 @@ require 'smart_proxy_ipam/ipam_helper'
 require 'smart_proxy_ipam/api_resource'
 require 'smart_proxy_ipam/ip_cache'
 
-module Proxy::Ipam
+module Proxy::Netbox
   # Implementation class for External IPAM provider Netbox
   class NetboxClient
     include Proxy::Log
@@ -24,7 +24,7 @@ module Proxy::Ipam
       @api_base = "#{conf[:url]}/api/"
       @token = conf[:token]
       @api_resource = ApiResource.new(api_base: @api_base, token: 'Token ' + @token)
-      @ip_cache = IpCache.new(provider: "netbox")
+      @ip_cache = IpCache.new(provider: 'netbox')
     end
 
     def get_ipam_subnet(cidr, group_name = nil)
@@ -68,7 +68,7 @@ module Proxy::Ipam
       return nil if json_body['count'].zero?
 
       group = {
-        name: json_body['results'][0]['name'], 
+        name: json_body['results'][0]['name'],
         description: json_body['results'][0]['description']
       }
 
@@ -109,7 +109,7 @@ module Proxy::Ipam
       return subnets if json_body['results']
     end
 
-    def ip_exists?(ip, group_name)
+    def ip_exists?(ip, _group_name)
       response = @api_resource.get("ipam/ip-addresses/?address=#{ip}")
       json_body = JSON.parse(response.body)
       return false if json_body['count'].zero?

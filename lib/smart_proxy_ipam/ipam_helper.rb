@@ -1,5 +1,7 @@
 # Module containing helper methods for use by all External IPAM provider implementations
 module Proxy::Ipam::IpamHelper
+  include ::Proxy::Validations
+
   def get_ipam_subnet(group_name, cidr)
     subnet = nil
 
@@ -59,13 +61,13 @@ module Proxy::Ipam::IpamHelper
 
   def validate_mac!(mac)
     unless mac.match(/^([0-9a-fA-F]{2}[:]){5}[0-9a-fA-F]{2}$/i)
-      raise Proxy::Validations::Error.new, "Mac address is not valid"
+      raise Proxy::Validations::Error.new, 'Mac address is not valid'
     end
     mac
   end
 
   def provider
-    @provider ||= 
+    @provider ||=
       begin
         unless client.authenticated?
           halt 500, {error: 'Invalid credentials for External IPAM'}.to_json

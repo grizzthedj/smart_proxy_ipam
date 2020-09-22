@@ -11,7 +11,7 @@ module Proxy::Phpipam
     end)
 
     load_dependency_injection_wirings(proc do |container_instance, settings|
-      container_instance.dependency :externalipam_client, -> { ::Proxy::Ipam::PhpipamClient.new(settings) }
+      container_instance.dependency :externalipam_client, -> { ::Proxy::Phpipam::PhpipamClient.new(settings) }
     end)
   end
 end

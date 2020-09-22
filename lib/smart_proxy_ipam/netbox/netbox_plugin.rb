@@ -11,7 +11,7 @@ module Proxy::Netbox
     end)
 
     load_dependency_injection_wirings(proc do |container_instance, settings|
-      container_instance.dependency :externalipam_client, -> { ::Proxy::Ipam::NetboxClient.new(settings) }
+      container_instance.dependency :externalipam_client, -> { ::Proxy::Netbox::NetboxClient.new(settings) }
     end)
   end
 end

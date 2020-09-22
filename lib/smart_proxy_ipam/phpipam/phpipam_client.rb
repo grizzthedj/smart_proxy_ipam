@@ -11,7 +11,7 @@ require 'smart_proxy_ipam/ipam_helper'
 require 'smart_proxy_ipam/api_resource'
 require 'smart_proxy_ipam/ip_cache'
 
-module Proxy::Ipam
+module Proxy::Phpipam
   # Implementation class for External IPAM provider phpIPAM
   class PhpipamClient
     include Proxy::Log
@@ -25,7 +25,7 @@ module Proxy::Ipam
       @api_base = "#{@conf[:url]}/api/#{@conf[:user]}/"
       @token = authenticate('/user/')
       @api_resource = ApiResource.new(api_base: @api_base, token: @token, auth_header: 'Token')
-      @ip_cache = IpCache.new(provider: "phpipam")
+      @ip_cache = IpCache.new(provider: 'phpipam')
     end
 
     def get_ipam_subnet(cidr, group_id = nil)
@@ -202,11 +202,11 @@ module Proxy::Ipam
       auth_uri = URI(@api_base + path)
       request = Net::HTTP::Post.new(auth_uri)
       request.basic_auth @conf[:user], @conf[:password]
-  
+
       response = Net::HTTP.start(auth_uri.hostname, auth_uri.port, use_ssl: auth_uri.scheme == 'https') do |http|
         http.request(request)
       end
-  
+
       response = JSON.parse(response.body)
       logger.warn(response['message']) if response['message']
       response.dig('data', 'token')

@@ -8,7 +8,7 @@ module Proxy::Ipam
   # Generic API for External IPAM interactions
   class Api < ::Sinatra::Base
     extend Proxy::Ipam::DependencyInjection
-    
+
     include ::Proxy::Log
     helpers ::Proxy::Helpers
     include Proxy::Ipam::IpamHelper
@@ -181,7 +181,7 @@ module Proxy::Ipam
 
       begin
         validate_required_params!([:group], params)
-        
+
         group_name = get_request_group(params)
 
         group = provider.get_ipam_group(group_name)
@@ -373,9 +373,9 @@ module Proxy::Ipam
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
         del_ip_params = { cidr: cidr, subnet_id: subnet[:id], group_name: group_name }
         validate_ip_in_cidr!(ip, cidr)
-        
+
         ip_deleted = provider.delete_ip_from_subnet(ip, del_ip_params) # Returns nil on success
-        halt 500, ip_deleted.to_json unless ip_deleted.nil? 
+        halt 500, ip_deleted.to_json unless ip_deleted.nil?
         halt 200
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)

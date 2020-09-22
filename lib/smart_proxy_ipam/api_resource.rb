@@ -12,12 +12,13 @@ class ApiResource
   def initialize(params = {})
     @api_base = params[:api_base]
     @token = params[:token]
+    @auth_header = params[:auth_header] || 'Authorization'
   end
 
   def get(path)
     uri = URI(@api_base + path)
     request = Net::HTTP::Get.new(uri)
-    request['Token'] = @token
+    request[@auth_header] = @token
     request['Accept'] = 'application/json'
     request['Content-Type'] = 'application/json'
 
@@ -30,7 +31,7 @@ class ApiResource
     uri = URI(@api_base + path)
     uri.query = URI.encode_www_form(body) if body
     request = Net::HTTP::Delete.new(uri)
-    request['Token'] = @token
+    request[@auth_header] = @token
     request['Accept'] = 'application/json'
     request['Content-Type'] = 'application/json'
 
@@ -41,9 +42,9 @@ class ApiResource
 
   def post(path, body = nil)
     uri = URI(@api_base + path)
-    uri.query = URI.encode_www_form(body) if body
     request = Net::HTTP::Post.new(uri)
-    request['Token'] = @token
+    request.body = body
+    request[@auth_header] = @token
     request['Accept'] = 'application/json'
     request['Content-Type'] = 'application/json'
 

@@ -11,7 +11,7 @@ require 'smart_proxy_ipam/ipam_helper'
 require 'smart_proxy_ipam/api_resource'
 require 'smart_proxy_ipam/ip_cache'
 
-module Proxy::Phpipam
+module Proxy::Ipam
   # Implementation class for External IPAM provider phpIPAM
   class PhpipamClient
     include Proxy::Log
@@ -24,7 +24,7 @@ module Proxy::Phpipam
       @conf = conf
       @api_base = "#{@conf[:url]}/api/#{@conf[:user]}/"
       @token = authenticate('/user/')
-      @api_resource = ApiResource.new(api_base: @api_base, token: @token)
+      @api_resource = ApiResource.new(api_base: @api_base, token: @token, auth_header: 'Token')
       @ip_cache = IpCache.new(provider: "phpipam")
     end
 
@@ -36,8 +36,8 @@ module Proxy::Phpipam
       end
     end
 
-    def get_ipam_subnet_by_group(cidr, group_id, include_id = true)
-      subnets = get_ipam_subnets(group_id, include_id)
+    def get_ipam_subnet_by_group(cidr, group_id)
+      subnets = get_ipam_subnets(group_id)
       return nil if subnets.nil?
       subnet_id = nil
 
@@ -107,20 +107,21 @@ module Proxy::Phpipam
       return data if json_body['data']
     end
 
-    def get_ipam_subnets(group_id, include_id = true)
-      subnets = @api_resource.get("sections/#{group_id}/subnets/")
+    def get_ipam_subnets(group_name)
+      group = get_ipam_group(group_name)
+      raise errors[:no_subnet] if group.nil?
+      subnets = @api_resource.get("sections/#{group[:id]}/subnets/")
       json_body = JSON.parse(subnets.body)
       return nil if json_body['data'].nil?
 
       data = []
-      json_body['data'].each do |group|
-        item = {
-          subnet: group['subnet'],
-          mask: group['mask'],
-          description: group['description']
-        }
-        item[:id] = group['id'] if include_id
-        data.push(item)
+      json_body['data'].each do |subnet|
+        data.push({
+          id: subnet['id'],
+          subnet: subnet['subnet'],
+          mask: subnet['mask'],
+          description: subnet['description']
+        })
       end
 
       return data if json_body['data']
@@ -132,23 +133,25 @@ module Proxy::Phpipam
       json_body['success']
     end
 
-    def add_ip_to_subnet(ip, subnet_id)
-      data = { subnetId: subnet_id, ip: ip, description: 'Address auto added by Foreman' }
-      subnet = @api_resource.post('addresses/', data)
+    def add_ip_to_subnet(ip, params)
+      data = { subnetId: params[:subnet_id], ip: ip, description: 'Address auto added by Foreman' }
+      subnet = @api_resource.post('addresses/', data.to_json)
       json_body = JSON.parse(subnet.body)
       return nil if json_body['code'] == 201
       { error: 'Unable to add IP to External IPAM' }
     end
 
-    def delete_ip_from_subnet(ip, subnet_id)
-      subnet = @api_resource.delete("addresses/#{ip}/#{subnet_id}/")
+    def delete_ip_from_subnet(ip, params)
+      subnet = @api_resource.delete("addresses/#{ip}/#{params[:subnet_id]}/")
       json_body = JSON.parse(subnet.body)
       return nil if json_body['success']
       { error: 'Unable to delete IP from External IPAM' }
     end
 
-    def get_next_ip(subnet_id, mac, cidr, group_name)
-      response = @api_resource.get("subnets/#{subnet_id}/first_free/")
+    def get_next_ip(mac, cidr, group_name)
+      subnet = get_ipam_subnet(cidr, group_name)
+      raise errors[:no_subnet] if subnet.nil?
+      response = @api_resource.get("subnets/#{subnet[:id]}/first_free/")
       json_body = JSON.parse(response.body)
       group = group_name.nil? ? '' : group_name
       @ip_cache.set_group(group, {}) if @ip_cache.get_group(group).nil?
@@ -167,7 +170,7 @@ module Proxy::Phpipam
           next_ip = new_ip.to_s
           @ip_cache.add(new_ip, mac, cidr, group)
         else
-          next_ip = find_new_ip(subnet_id, new_ip, mac, cidr, group)
+          next_ip = find_new_ip(subnet[:id], new_ip, mac, cidr, group)
         end
 
         return { error: "Unable to find another available IP address in subnet #{cidr}" } if next_ip.nil?
@@ -188,7 +191,7 @@ module Proxy::Phpipam
     end
 
     def authenticated?
-      @api_resource.authenticated?
+      !@token.nil?
     end
 
     def subnet_exists?(subnet)

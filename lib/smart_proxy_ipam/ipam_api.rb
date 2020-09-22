@@ -44,12 +44,12 @@ module Proxy::Ipam
 
       begin
         validate_required_params!([:address, :prefix, :mac], params)
+
         mac = get_request_mac(params)
         cidr = get_request_cidr(params)
         group_name = get_request_group(params)
-        subnet = get_ipam_subnet(group_name, cidr)
-        halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
-        next_ip = provider.get_next_ip(subnet[:id], mac, cidr, group_name)
+
+        next_ip = provider.get_next_ip(mac, cidr, group_name)
         halt 404, { error: errors[:no_free_ips] }.to_json if next_ip.nil?
         next_ip.to_json
       rescue Proxy::Validations::Error => e
@@ -92,8 +92,10 @@ module Proxy::Ipam
 
       begin
         validate_required_params!([:address, :prefix], params)
+
         cidr = get_request_cidr(params)
         group_name = get_request_group(params)
+
         subnet = get_ipam_subnet(group_name, cidr)
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
         subnet.to_json
@@ -179,7 +181,9 @@ module Proxy::Ipam
 
       begin
         validate_required_params!([:group], params)
+        
         group_name = get_request_group(params)
+
         group = provider.get_ipam_group(group_name)
         halt 404, { error: errors[:no_group] }.to_json if group.nil?
         group.to_json
@@ -225,10 +229,12 @@ module Proxy::Ipam
 
       begin
         validate_required_params!([:group], params)
+
         group_name = get_request_group(params)
         group = provider.get_ipam_group(group_name)
+
         halt 404, { error: errors[:no_group] }.to_json if group.nil?
-        subnets = provider.get_ipam_subnets(group[:id].to_s, false)
+        subnets = provider.get_ipam_subnets(group[:id].to_s)
         halt 404, { error: errors[:no_subnets_in_group] }.to_json if subnets.nil?
         subnets.to_json
       rescue Proxy::Validations::Error => e
@@ -265,10 +271,12 @@ module Proxy::Ipam
 
       begin
         validate_required_params!([:address, :prefix, :ip], params)
+
         ip = get_request_ip(params)
         cidr = get_request_cidr(params)
         group_name = get_request_group(params)
         subnet = get_ipam_subnet(group_name, cidr)
+
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
         validate_ip_in_cidr!(ip, cidr)
         ip_exists = provider.ip_exists?(ip, subnet[:id])
@@ -308,13 +316,17 @@ module Proxy::Ipam
 
       begin
         validate_required_params!([:address, :ip, :prefix], params)
+
         ip = get_request_ip(params)
         cidr = get_request_cidr(params)
         group_name = get_request_group(params)
         subnet = get_ipam_subnet(group_name, cidr)
+
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
+        add_ip_params = { cidr: cidr, subnet_id: subnet[:id], group_name: group_name }
         validate_ip_in_cidr!(ip, cidr)
-        ip_added = provider.add_ip_to_subnet(ip, subnet[:id]) # Return nil on success
+
+        ip_added = provider.add_ip_to_subnet(ip, add_ip_params) # Returns nil on success
         halt 500, ip_added.to_json unless ip_added.nil?
         halt 201
       rescue Proxy::Validations::Error => e
@@ -352,13 +364,17 @@ module Proxy::Ipam
 
       begin
         validate_required_params!([:address, :ip, :prefix], params)
+
         ip = get_request_ip(params)
         cidr = get_request_cidr(params)
         group_name = URI.escape(params[:group]) if params[:group]
         subnet = get_ipam_subnet(group_name, cidr)
+
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
+        del_ip_params = { cidr: cidr, subnet_id: subnet[:id], group_name: group_name }
         validate_ip_in_cidr!(ip, cidr)
-        ip_deleted = provider.delete_ip_from_subnet(ip, subnet[:id]) # Return nil on success
+        
+        ip_deleted = provider.delete_ip_from_subnet(ip, del_ip_params) # Returns nil on success
         halt 500, ip_deleted.to_json unless ip_deleted.nil? 
         halt 200
       rescue Proxy::Validations::Error => e

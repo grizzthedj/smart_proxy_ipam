@@ -37,6 +37,10 @@ class IpamHelperTest < ::Test::Unit::TestCase
     assert_raise Proxy::Validations::Error do
       validate_ip!(bad_ip)
     end
+    bad_ip = '172.10.40.555'
+    assert_raise Proxy::Validations::Error do
+      validate_ip!(bad_ip)
+    end
   end
 
   def test_validate_cidr_should_return_valid_cidr

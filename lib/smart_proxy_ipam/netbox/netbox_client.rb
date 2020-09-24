@@ -23,51 +23,58 @@ module Proxy::Netbox
     def initialize(conf)
       @api_base = "#{conf[:url]}/api/"
       @token = conf[:token]
-      @api_resource = ApiResource.new(api_base: @api_base, token: 'Token ' + @token)
-      @ip_cache = IpCache.new(provider: 'netbox')
+      @api_resource = Proxy::Ipam::ApiResource.new(api_base: @api_base, token: 'Token ' + @token)
+      @ip_cache = Proxy::Ipam::IpCache.new(provider: 'netbox')
     end
 
-    def get_ipam_subnet(cidr, group_name = nil)
-      if group_name.nil? || group_name.empty?
-        response = @api_resource.get("ipam/prefixes/?status=active&prefix=#{cidr}")
+    def get_ipam_subnet(cidr, group_id = nil)
+      if group_id.nil?
+        get_ipam_subnet_by_cidr(cidr)
       else
-        group_id = get_group_id(group_name)
-        response = @api_resource.get("ipam/prefixes/?status=active&prefix=#{cidr}&tenant_id=#{group_id}")
+        get_ipam_subnet_by_group(cidr, group_id)
       end
+    end
 
+    def get_ipam_subnet_by_group(cidr, group_id)
+      response = @api_resource.get("ipam/prefixes/?status=active&prefix=#{cidr}&vrf_id=#{group_id}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?
+      subnet = subnet_from_result(json_body['results'][0])
+      return subnet if json_body['results']
+    end
 
-      subnet = {
-        subnet: json_body['results'][0]['prefix'].split('/').first,
-        mask: json_body['results'][0]['prefix'].split('/').last,
-        description: json_body['results'][0]['description'],
-        id: json_body['results'][0]['id']
-      }
-
+    def get_ipam_subnet_by_cidr(cidr)
+      response = @api_resource.get("ipam/prefixes/?status=active&prefix=#{cidr}")
+      json_body = JSON.parse(response.body)
+      return nil if json_body['count'].zero?
+      subnet = subnet_from_result(json_body['results'][0])
       return subnet if json_body['results']
     end
 
     def get_ipam_groups
-      response = @api_resource.get('tenancy/tenants/')
+      response = @api_resource.get('ipam/vrfs/')
       json_body = JSON.parse(response.body)
       groups = []
 
       return nil if json_body['count'].zero?
 
       json_body['results'].each do |group|
-        groups.push({ name: group['name'], description: group['description'] })
+        groups.push({
+          name: group['name'],
+          description: group['description']
+        })
       end
 
       groups
     end
 
     def get_ipam_group(group_name)
-      response = @api_resource.get("tenancy/tenants/?name=#{group_name}")
+      response = @api_resource.get("ipam/vrfs/?name=#{group_name}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?
 
       group = {
+        id: json_body['results'][0]['id'],
         name: json_body['results'][0]['name'],
         description: json_body['results'][0]['description']
       }
@@ -76,26 +83,23 @@ module Proxy::Netbox
     end
 
     def get_group_id(group_name)
-      response = @api_resource.get("tenancy/tenants/?name=#{group_name}")
-      json_body = JSON.parse(response.body)
-      return nil if json_body['count'].zero?
-      id = json_body['results'][0]['id']
-      return id if json_body['results']
+      return nil if group_name.nil? || group_name.empty?
+      group = get_ipam_group(group_name)
+      raise errors[:no_group] if group.nil?
+      group[:id]
     end
 
-    def get_ipam_subnets(group_name = '')
-      if group_name.empty?
+    def get_ipam_subnets(group_name)
+      if group_name.nil?
         response = @api_resource.get('ipam/prefixes/?status=active')
       else
         group_id = get_group_id(group_name)
-        response = @api_resource.get("ipam/prefixes/?status=active&tenant_id=#{group_id}")
+        response = @api_resource.get("ipam/prefixes/?status=active&vrf_id=#{group_id}")
       end
 
       json_body = JSON.parse(response.body)
-
-      subnets = []
-
       return nil if json_body['count'].zero?
+      subnets = []
 
       json_body['results'].each do |subnet|
         subnets.push({
@@ -109,8 +113,12 @@ module Proxy::Netbox
       return subnets if json_body['results']
     end
 
-    def ip_exists?(ip, _group_name)
-      response = @api_resource.get("ipam/ip-addresses/?address=#{ip}")
+    def ip_exists?(ip, subnet_id, group_name)
+      group_id = get_group_id(group_name)
+      url = "ipam/ip-addresses/?address=#{ip}"
+      url += "&prefix_id=#{subnet_id}" unless subnet_id.nil?
+      url += "&vrf_id=#{group_id}" unless group_id.nil?
+      response = @api_resource.get(url)
       json_body = JSON.parse(response.body)
       return false if json_body['count'].zero?
       true
@@ -125,12 +133,12 @@ module Proxy::Netbox
         data = { address: address, nat_outside: 0, description: desc }
       else
         group_id = get_group_id(group_name)
-        data = { tenant_id: group_id, address: address, nat_outside: 0, description: desc }
+        data = { vrf: group_id, address: address, nat_outside: 0, description: desc }
       end
 
       response = @api_resource.post('ipam/ip-addresses/', data.to_json)
       return nil if response.code == '201'
-      { error: 'Unable to connect to External IPAM server' }
+      { error: "Unable to add #{address} in External IPAM server" }
     end
 
     def delete_ip_from_subnet(ip, params)
@@ -140,12 +148,12 @@ module Proxy::Netbox
         response = @api_resource.get("ipam/ip-addresses/?address=#{ip}")
       else
         group_id = get_group_id(group_name)
-        response = @api_resource.get("ipam/ip-addresses/?address=#{ip}&tenant_id=#{group_id}")
+        response = @api_resource.get("ipam/ip-addresses/?address=#{ip}&vrf_id=#{group_id}")
       end
 
       json_body = JSON.parse(response.body)
 
-      return { error: 'No addresses found' } if json_body['count'].zero?
+      return { error: errors[:no_ip] } if json_body['count'].zero?
 
       address_id = json_body['results'][0]['id']
       response = @api_resource.delete("ipam/ip-addresses/#{address_id}/")
@@ -195,6 +203,15 @@ module Proxy::Netbox
 
     private
 
+    def subnet_from_result(result)
+      {
+        subnet: result['prefix'].split('/').first,
+        mask: result['prefix'].split('/').last,
+        description: result['description'],
+        id: result['id']
+      }
+    end
+
     # Called when next available IP from external IPAM has been cached by another user/host, but
     # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and
     # see if it is available in external IPAM.
@@ -205,7 +222,7 @@ module Proxy::Netbox
 
       loop do
         new_ip = increment_ip(temp_ip)
-        ipam_ip = ip_exists?(new_ip, subnet_id)
+        ipam_ip = ip_exists?(new_ip, subnet_id, group_name)
 
         # If new IP doesn't exist in IPAM and not in the cache
         if !ipam_ip && !@ip_cache.ip_exists(new_ip, cidr, group_name)

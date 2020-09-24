@@ -24,8 +24,8 @@ module Proxy::Phpipam
       @conf = conf
       @api_base = "#{@conf[:url]}/api/#{@conf[:user]}/"
       @token = authenticate('/user/')
-      @api_resource = ApiResource.new(api_base: @api_base, token: @token, auth_header: 'Token')
-      @ip_cache = IpCache.new(provider: 'phpipam')
+      @api_resource = Proxy::Ipam::ApiResource.new(api_base: @api_base, token: @token, auth_header: 'Token')
+      @ip_cache = Proxy::Ipam::IpCache.new(provider: 'phpipam')
     end
 
     def get_ipam_subnet(cidr, group_id = nil)
@@ -109,7 +109,7 @@ module Proxy::Phpipam
 
     def get_ipam_subnets(group_name)
       group = get_ipam_group(group_name)
-      raise errors[:no_subnet] if group.nil?
+      raise errors[:no_group] if group.nil?
       subnets = @api_resource.get("sections/#{group[:id]}/subnets/")
       json_body = JSON.parse(subnets.body)
       return nil if json_body['data'].nil?
@@ -127,7 +127,7 @@ module Proxy::Phpipam
       return data if json_body['data']
     end
 
-    def ip_exists?(ip, subnet_id)
+    def ip_exists?(ip, subnet_id, _group_name)
       ip = @api_resource.get("subnets/#{subnet_id}/addresses/#{ip}/")
       json_body = JSON.parse(ip.body)
       json_body['success']
@@ -212,8 +212,6 @@ module Proxy::Phpipam
       response.dig('data', 'token')
     end
 
-    private
-
     # Called when next available IP from external IPAM has been cached by another user/host, but
     # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and
     # see if it is available in external IPAM.
@@ -224,7 +222,7 @@ module Proxy::Phpipam
 
       loop do
         new_ip = increment_ip(temp_ip)
-        ipam_ip = ip_exists?(new_ip, subnet_id)
+        ipam_ip = ip_exists?(new_ip, subnet_id, group_name)
 
         # If new IP doesn't exist in IPAM and not in the cache
         if !ipam_ip && !@ip_cache.ip_exists(new_ip, cidr, group_name)

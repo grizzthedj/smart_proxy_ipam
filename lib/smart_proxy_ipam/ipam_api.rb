@@ -231,10 +231,8 @@ module Proxy::Ipam
         validate_required_params!([:group], params)
 
         group_name = get_request_group(params)
-        group = provider.get_ipam_group(group_name)
+        subnets = provider.get_ipam_subnets(group_name)
 
-        halt 404, { error: errors[:no_group] }.to_json if group.nil?
-        subnets = provider.get_ipam_subnets(group[:id].to_s)
         halt 404, { error: errors[:no_subnets_in_group] }.to_json if subnets.nil?
         subnets.to_json
       rescue Proxy::Validations::Error => e
@@ -279,7 +277,7 @@ module Proxy::Ipam
 
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
         validate_ip_in_cidr!(ip, cidr)
-        ip_exists = provider.ip_exists?(ip, subnet[:id])
+        ip_exists = provider.ip_exists?(ip, subnet[:id], group_name)
         halt 200, ip_exists.to_json
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)

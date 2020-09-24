@@ -45,6 +45,7 @@ module Proxy::Ipam::IpamHelper
 
   def validate_cidr!(address, prefix)
     cidr = "#{address}/#{prefix}"
+    network = IPAddr.new(cidr).to_s
     if IPAddr.new(cidr).to_s != IPAddr.new(address).to_s
       raise Proxy::Validations::Error, "Network address #{address} should be #{network} with prefix #{prefix}"
     end
@@ -116,9 +117,9 @@ module Proxy::Ipam::IpamHelper
       provider: "The IPAM provider must be specified(e.g. 'phpipam' or 'netbox')",
       groups_not_supported: 'Groups are not supported',
       add_ip: 'Error adding IP to External IPAM',
-      bad_mac: 'The format of the mac address is invalid',
-      bad_ip: 'The format of the ip address is invalid',
-      bad_cidr: 'The format of the network cidr is invalid'
+      bad_mac: 'Mac address is invalid',
+      bad_ip: 'IP address is invalid',
+      bad_cidr: 'The network cidr is invalid'
     }
   end
 end

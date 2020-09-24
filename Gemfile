@@ -3,7 +3,8 @@ source 'https://rubygems.org'
 gemspec
 
 gem 'concurrent-ruby', '~> 1.0', require: 'concurrent'
-gem 'json'
+gem 'json', '>= 2.3.0'
+gem 'rack', '>= 2.1.4'
 
 group :development do
   gem 'mocha'

@@ -1,7 +1,7 @@
 require 'proxy/validations'
-
 require 'smart_proxy_ipam/ipam'
 require 'smart_proxy_ipam/ipam_helper'
+require 'smart_proxy_ipam/ipam_validator'
 require 'smart_proxy_ipam/dependency_injection'
 
 module Proxy::Ipam
@@ -12,6 +12,7 @@ module Proxy::Ipam
     include ::Proxy::Log
     helpers ::Proxy::Helpers
     include Proxy::Ipam::IpamHelper
+    include Proxy::Ipam::IpamValidator
 
     inject_attr :externalipam_client, :client
 
@@ -96,7 +97,7 @@ module Proxy::Ipam
         cidr = get_request_cidr(params)
         group_name = get_request_group(params)
 
-        subnet = get_ipam_subnet(group_name, cidr)
+        subnet = provider.get_ipam_subnet(cidr, group_name)
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
         subnet.to_json
       rescue Proxy::Validations::Error => e
@@ -273,7 +274,7 @@ module Proxy::Ipam
         ip = get_request_ip(params)
         cidr = get_request_cidr(params)
         group_name = get_request_group(params)
-        subnet = get_ipam_subnet(group_name, cidr)
+        subnet = provider.get_ipam_subnet(cidr, group_name)
 
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
         validate_ip_in_cidr!(ip, cidr)
@@ -318,7 +319,7 @@ module Proxy::Ipam
         ip = get_request_ip(params)
         cidr = get_request_cidr(params)
         group_name = get_request_group(params)
-        subnet = get_ipam_subnet(group_name, cidr)
+        subnet = provider.get_ipam_subnet(cidr, group_name)
 
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
         add_ip_params = { cidr: cidr, subnet_id: subnet[:id], group_name: group_name }
@@ -366,7 +367,7 @@ module Proxy::Ipam
         ip = get_request_ip(params)
         cidr = get_request_cidr(params)
         group_name = URI.escape(params[:group]) if params[:group]
-        subnet = get_ipam_subnet(group_name, cidr)
+        subnet = provider.get_ipam_subnet(cidr, group_name)
 
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
         del_ip_params = { cidr: cidr, subnet_id: subnet[:id], group_name: group_name }

@@ -8,6 +8,7 @@ require 'uri'
 require 'sinatra'
 require 'smart_proxy_ipam/ipam'
 require 'smart_proxy_ipam/ipam_helper'
+require 'smart_proxy_ipam/ipam_validator'
 require 'smart_proxy_ipam/api_resource'
 require 'smart_proxy_ipam/ip_cache'
 
@@ -16,9 +17,9 @@ module Proxy::Netbox
   class NetboxClient
     include Proxy::Log
     include Proxy::Ipam::IpamHelper
+    include Proxy::Ipam::IpamValidator
 
     @ip_cache = nil
-    MAX_RETRIES = 5
 
     def initialize(conf)
       @api_base = "#{conf[:url]}/api/"
@@ -27,10 +28,11 @@ module Proxy::Netbox
       @ip_cache = Proxy::Ipam::IpCache.new(provider: 'netbox')
     end
 
-    def get_ipam_subnet(cidr, group_id = nil)
-      if group_id.nil?
+    def get_ipam_subnet(cidr, group_name = nil)
+      if group_name.nil?
         get_ipam_subnet_by_cidr(cidr)
       else
+        group_id = get_group_id(group_name)
         get_ipam_subnet_by_group(cidr, group_id)
       end
     end
@@ -69,6 +71,7 @@ module Proxy::Netbox
     end
 
     def get_ipam_group(group_name)
+      raise { 'Groups are not supported' }.to_json unless groups_supported?
       response = @api_resource.get("ipam/vrfs/?name=#{group_name}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?
@@ -183,11 +186,12 @@ module Proxy::Netbox
           next_ip = new_ip.to_s
           @ip_cache.add(new_ip, mac, cidr, group)
         else
-          next_ip = find_new_ip(subnet[:id], new_ip, mac, cidr, group)
+          next_ip = find_new_ip(@ip_cache, subnet[:id], new_ip, mac, cidr, group)
         end
 
-        return { error: "Unable to find another available IP address in subnet #{cidr}" } if next_ip.nil?
-        return { error: "It is possible that there are no more free addresses in subnet #{cidr}. Available IP's may be cached, and could become available after in-memory IP cache is cleared(up to #{@ip_cache.get_cleanup_interval} seconds)." } unless usable_ip(next_ip, cidr)
+        unless usable_ip(next_ip, cidr)
+          return { error: "No free addresses found in subnet #{cidr}. Some available ip's may be cached. Try again in #{@ip_cache.get_cleanup_interval} seconds after cache is cleared." }
+        end
       end
 
       next_ip
@@ -210,36 +214,6 @@ module Proxy::Netbox
         description: result['description'],
         id: result['id']
       }
-    end
-
-    # Called when next available IP from external IPAM has been cached by another user/host, but
-    # not actually persisted in external IPAM. Will increment the IP(MAX_RETRIES times), and
-    # see if it is available in external IPAM.
-    def find_new_ip(subnet_id, ip, mac, cidr, group_name)
-      found_ip = nil
-      temp_ip = ip
-      retry_count = 0
-
-      loop do
-        new_ip = increment_ip(temp_ip)
-        ipam_ip = ip_exists?(new_ip, subnet_id, group_name)
-
-        # If new IP doesn't exist in IPAM and not in the cache
-        if !ipam_ip && !@ip_cache.ip_exists(new_ip, cidr, group_name)
-          found_ip = new_ip.to_s
-          @ip_cache.add(found_ip, mac, cidr, group_name)
-          break
-        end
-
-        temp_ip = new_ip
-        retry_count += 1
-        break if retry_count >= MAX_RETRIES
-      end
-
-      # Return the original IP found in external ipam if no new ones found after MAX_RETRIES
-      return ip if found_ip.nil?
-
-      found_ip
     end
   end
 end

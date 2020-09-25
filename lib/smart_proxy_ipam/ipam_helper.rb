@@ -2,69 +2,45 @@
 module Proxy::Ipam::IpamHelper
   include ::Proxy::Validations
 
-  def get_ipam_subnet(group_name, cidr)
-    subnet = nil
+  MAX_IP_RETRIES = 5
 
-    if group_name.nil? || group_name.empty?
-      subnet = provider.get_ipam_subnet(cidr)
-    else
-      group = provider.get_ipam_group(group_name)
-      halt 500, { error: 'Groups are not supported' }.to_json unless provider.groups_supported?
-      halt 404, { error: "No group #{group_name} found" }.to_json if group.nil?
-      subnet = provider.get_ipam_subnet(cidr, group[:id])
+  # Called when next available IP from external IPAM has been cached by another user/host, but
+  # not actually persisted in external IPAM. Will increment the IP, MAX_RETRIES times, and
+  # check if it is available in external IPAM each iteration
+  def find_new_ip(ip_cache, subnet_id, ip, mac, cidr, group_name)
+    found_ip = nil
+    temp_ip = ip
+    retry_count = 0
+
+    loop do
+      new_ip = increment_ip(temp_ip)
+      ipam_ip = ip_exists?(new_ip, subnet_id, group_name)
+
+      # If new IP doesn't exist in IPAM and not in the cache
+      if !ipam_ip && !ip_cache.ip_exists(new_ip, cidr, group_name)
+        found_ip = new_ip.to_s
+        ip_cache.add(found_ip, mac, cidr, group_name)
+        break
+      end
+
+      temp_ip = new_ip
+      retry_count += 1
+      break if retry_count >= MAX_IP_RETRIES
     end
 
-    subnet
+    # Return the original IP found in external ipam if no new ones found after MAX_IP_RETRIES
+    return ip if found_ip.nil?
+
+    found_ip
   end
 
   def increment_ip(ip)
     IPAddr.new(ip.to_s).succ.to_s
   end
 
-  # Checks if given IP is within a subnet. Broadcast address is considered unusable
   def usable_ip(ip, cidr)
     network = IPAddr.new(cidr)
     network.include?(IPAddr.new(ip)) && network.to_range.last != ip
-  end
-
-  def validate_required_params!(required_params, params)
-    err = []
-    required_params.each do |param|
-      unless params[param.to_sym]
-        err.push errors[param.to_sym]
-      end
-    end
-    raise Proxy::Validations::Error, err unless err.empty?
-  end
-
-  def validate_ip!(ip)
-    IPAddr.new(ip).to_s
-  rescue IPAddr::InvalidAddressError => e
-    raise Proxy::Validations::Error, e.to_s
-  end
-
-  def validate_cidr!(address, prefix)
-    cidr = "#{address}/#{prefix}"
-    network = IPAddr.new(cidr).to_s
-    if IPAddr.new(cidr).to_s != IPAddr.new(address).to_s
-      raise Proxy::Validations::Error, "Network address #{address} should be #{network} with prefix #{prefix}"
-    end
-    cidr
-  rescue IPAddr::Error => e
-    raise Proxy::Validations::Error, e.to_s
-  end
-
-  def validate_ip_in_cidr!(ip, cidr)
-    unless IPAddr.new(cidr).include?(IPAddr.new(ip))
-      raise Proxy::Validations::Error.new, "IP #{ip} is not in #{cidr}"
-    end
-  end
-
-  def validate_mac!(mac)
-    unless mac.match(/^([0-9a-fA-F]{2}[:]){5}[0-9a-fA-F]{2}$/i)
-      raise Proxy::Validations::Error.new, 'Mac address is not valid'
-    end
-    mac
   end
 
   def provider

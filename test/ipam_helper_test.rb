@@ -13,48 +13,21 @@ class IpamHelperTest < ::Test::Unit::TestCase
     Proxy::Ipam::Api.new
   end
 
-  def test_validate_mac_should_return_valid_mac_address
-    good_mac = '3c:51:0e:df:9f:01'
-    validated_mac = validate_mac!(good_mac)
-    assert validated_mac == good_mac
+  def test_usable_ip_in_cidr
+    cidr = '10.20.30.0/29'
+    valid_ip = '10.20.30.1'
+    assert usable_ip(valid_ip, cidr)
   end
 
-  def test_validate_mac_should_return_nil_for_invalid_mac_address
-    bad_mac = 'this is not a mac address'
-    assert_raise Proxy::Validations::Error do
-      validate_mac!(bad_mac)
-    end
+  def test_unusable_ip_in_cidr
+    cidr = '10.20.30.0/29'
+    invalid_ip = '10.20.30.9'
+    refute usable_ip(invalid_ip, cidr)
   end
 
-  def test_validate_ip_should_return_valid_ip_address
-    good_ip = '172.10.40.33'
-    validated_ip = validate_ip!(good_ip)
-    assert validated_ip == good_ip
-  end
-
-  def test_validate_ip_should_return_nil_for_invalid_ip_address
-    bad_ip = 'this is not an ip address'
-    assert_raise Proxy::Validations::Error do
-      validate_ip!(bad_ip)
-    end
-    bad_ip = '172.10.40.555'
-    assert_raise Proxy::Validations::Error do
-      validate_ip!(bad_ip)
-    end
-  end
-
-  def test_validate_cidr_should_return_valid_cidr
-    address = '172.10.40.0'
-    prefix = '29'
-    validated_cidr = validate_cidr!(address, prefix)
-    assert validated_cidr == address + '/' + prefix
-  end
-
-  def test_validate_cidr_should_return_nil_for_invalid_cidr
-    address = 'bad address'
-    prefix = 'bad prefix'
-    assert_raise Proxy::Validations::Error do
-      validate_cidr!(address, prefix)
-    end
+  def test_increment_ip
+    ip = '10.20.30.1'
+    incremented_ip = increment_ip(ip)
+    assert incremented_ip == '10.20.30.2'
   end
 end

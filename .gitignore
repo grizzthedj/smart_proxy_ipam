@@ -1,5 +1,5 @@
 
+Gemfile.lock
 settings.d/*.yml
 *.gem
-test.rb
 *.swp

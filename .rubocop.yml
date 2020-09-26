@@ -27,6 +27,9 @@ Style/Documentation:
 Style/GuardClause:
   Enabled: false
 
+Style/PercentLiteralDelimiters:
+  Enabled: false
+
 # === Lint rules
 Lint/UriEscapeUnescape:
   Enabled: false

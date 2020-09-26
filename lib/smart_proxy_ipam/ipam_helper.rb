@@ -4,9 +4,11 @@ module Proxy::Ipam::IpamHelper
 
   MAX_IP_RETRIES = 5
 
-  # Called when next available IP from external IPAM has been cached by another user/host, but
-  # not actually persisted in external IPAM. Will increment the IP, MAX_RETRIES times, and
-  # check if it is available in external IPAM each iteration
+  # Called when next available IP from External IPAM has been cached by another user/host, but
+  # not actually persisted in External IPAM yet. This method will increment the IP, up to
+  # MAX_IP_RETRIES times, and check if it is available in External IPAM each iteration. It
+  # will return the original IP(the 'ip' param) if no new IP's are found after MAX_IP_RETRIES
+  # iterations.
   def find_new_ip(ip_cache, subnet_id, ip, mac, cidr, group_name)
     found_ip = nil
     temp_ip = ip
@@ -28,10 +30,38 @@ module Proxy::Ipam::IpamHelper
       break if retry_count >= MAX_IP_RETRIES
     end
 
-    # Return the original IP found in external ipam if no new ones found after MAX_IP_RETRIES
     return ip if found_ip.nil?
 
     found_ip
+  end
+
+  # Checks the cache for existing ip, and returns it if it exists. If not exists, it will
+  # find a new ip (using find_new_ip), and it is added to the cache.
+  def cache_next_ip(ip_cache, ip, mac, cidr, subnet_id, group_name)
+    group = group_name.nil? ? '' : group_name
+    ip_cache.set_group(group, {}) if ip_cache.get_group(group).nil?
+    subnet_hash = ip_cache.get_cidr(group, cidr)
+    next_ip = nil
+
+    if subnet_hash&.key?(mac.to_sym)
+      next_ip = ip_cache.get_ip(group, cidr, mac)
+    else
+      new_ip = ip
+      ip_not_in_cache = subnet_hash.nil? ? true : !subnet_hash.to_s.include?(new_ip.to_s)
+
+      if ip_not_in_cache
+        next_ip = new_ip.to_s
+        ip_cache.add(new_ip, mac, cidr, group)
+      else
+        next_ip = find_new_ip(ip_cache, subnet_id, new_ip, mac, cidr, group)
+      end
+
+      unless usable_ip(next_ip, cidr)
+        return { error: "No free addresses found in subnet #{cidr}. Some available ip's may be cached. Try again in #{@ip_cache.get_cleanup_interval} seconds after cache is cleared." }
+      end
+    end
+
+    next_ip
   end
 
   def increment_ip(ip)

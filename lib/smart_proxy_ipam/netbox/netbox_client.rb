@@ -1,9 +1,6 @@
 require 'yaml'
 require 'json'
 require 'net/http'
-require 'monitor'
-require 'concurrent'
-require 'time'
 require 'uri'
 require 'sinatra'
 require 'smart_proxy_ipam/ipam'
@@ -169,32 +166,9 @@ module Proxy::Netbox
       raise errors[:no_subnet] if subnet.nil?
       response = @api_resource.get("ipam/prefixes/#{subnet[:id]}/available-ips/?limit=1")
       json_body = JSON.parse(response.body)
-      group = group_name.nil? ? '' : group_name
-      @ip_cache.set_group(group, {}) if @ip_cache.get_group(group).nil?
-      subnet_hash = @ip_cache.get_cidr(group, cidr)
-      next_ip = nil
-
       return nil if json_body.empty?
-
-      if subnet_hash&.key?(mac.to_sym)
-        next_ip = @ip_cache.get_ip(group, cidr, mac)
-      else
-        new_ip = json_body[0]['address'].split('/').first
-        ip_not_in_cache = subnet_hash.nil? ? true : !subnet_hash.to_s.include?(new_ip.to_s)
-
-        if ip_not_in_cache
-          next_ip = new_ip.to_s
-          @ip_cache.add(new_ip, mac, cidr, group)
-        else
-          next_ip = find_new_ip(@ip_cache, subnet[:id], new_ip, mac, cidr, group)
-        end
-
-        unless usable_ip(next_ip, cidr)
-          return { error: "No free addresses found in subnet #{cidr}. Some available ip's may be cached. Try again in #{@ip_cache.get_cleanup_interval} seconds after cache is cleared." }
-        end
-      end
-
-      next_ip
+      ip = json_body[0]['address'].split('/').first
+      cache_next_ip(@ip_cache, ip, mac, cidr, subnet[:id], group_name)
     end
 
     def groups_supported?

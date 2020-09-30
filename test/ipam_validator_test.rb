@@ -26,18 +26,35 @@ class IpamValidatorTest < ::Test::Unit::TestCase
     end
   end
 
-  def test_validate_ip_should_return_valid_ip_address
+  def test_validate_ip_should_return_valid_ipv4_address
     good_ip = '172.10.40.33'
     validated_ip = validate_ip!(good_ip)
     assert validated_ip == good_ip
   end
 
-  def test_validate_ip_should_return_nil_for_invalid_ip_address
+  def test_validate_ip_should_raise_exception_for_invalid_ipv4_address
     bad_ip = 'this is not an ip address'
     assert_raise Proxy::Validations::Error do
       validate_ip!(bad_ip)
     end
     bad_ip = '172.10.40.555'
+    assert_raise Proxy::Validations::Error do
+      validate_ip!(bad_ip)
+    end
+  end
+
+  def test_validate_ip_should_return_valid_ipv6_address
+    good_ip = 'ff02::1'
+    validated_ip = validate_ip!(good_ip)
+    assert validated_ip == good_ip
+  end
+
+  def test_validate_ip_should_raise_exception_for_invalid_ipv6_address
+    bad_ip = 'ff02::1::1'
+    assert_raise Proxy::Validations::Error do
+      validate_ip!(bad_ip)
+    end
+    bad_ip = 'this is not an ip address'
     assert_raise Proxy::Validations::Error do
       validate_ip!(bad_ip)
     end

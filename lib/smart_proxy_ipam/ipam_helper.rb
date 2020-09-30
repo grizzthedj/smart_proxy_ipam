@@ -4,6 +4,16 @@ module Proxy::Ipam::IpamHelper
 
   MAX_IP_RETRIES = 5
 
+  def provider
+    @provider ||=
+      begin
+        unless client.authenticated?
+          halt 500, {error: 'Invalid credentials for External IPAM'}.to_json
+        end
+        client
+      end
+  end
+
   # Called when next available IP from External IPAM has been cached by another user/host, but
   # not actually persisted in External IPAM yet. This method will increment the IP, up to
   # MAX_IP_RETRIES times, and check if it is available in External IPAM each iteration. It
@@ -71,34 +81,6 @@ module Proxy::Ipam::IpamHelper
   def usable_ip(ip, cidr)
     network = IPAddr.new(cidr)
     network.include?(IPAddr.new(ip)) && network.to_range.last != ip
-  end
-
-  def provider
-    @provider ||=
-      begin
-        unless client.authenticated?
-          halt 500, {error: 'Invalid credentials for External IPAM'}.to_json
-        end
-        client
-      end
-  end
-
-  def get_request_ip(params)
-    ip = validate_ip!(params[:ip])
-    halt 400, { error: errors[:bad_ip] }.to_json if ip.nil?
-    ip
-  end
-
-  def get_request_cidr(params)
-    cidr = validate_cidr!(params[:address], params[:prefix])
-    halt 400, { error: errors[:bad_cidr] }.to_json if cidr.nil?
-    cidr
-  end
-
-  def get_request_mac(params)
-    mac = validate_mac!(params[:mac])
-    halt 400, { error: errors[:bad_mac] }.to_json if mac.nil?
-    mac
   end
 
   def get_request_group(params)

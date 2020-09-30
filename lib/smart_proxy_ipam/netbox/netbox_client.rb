@@ -26,7 +26,7 @@ module Proxy::Netbox
     end
 
     def get_ipam_subnet(cidr, group_name = nil)
-      if group_name.nil?
+      if group_name.nil? || group_name.empty?
         get_ipam_subnet_by_cidr(cidr)
       else
         group_id = get_group_id(group_name)
@@ -68,7 +68,7 @@ module Proxy::Netbox
     end
 
     def get_ipam_group(group_name)
-      raise { 'Groups are not supported' }.to_json unless groups_supported?
+      raise errors[:groups_not_supported] unless groups_supported?
       response = @api_resource.get("ipam/vrfs/?name=#{group_name}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?

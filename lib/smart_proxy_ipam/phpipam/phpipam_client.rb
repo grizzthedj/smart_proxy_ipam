@@ -27,7 +27,7 @@ module Proxy::Phpipam
     end
 
     def get_ipam_subnet(cidr, group_name = nil)
-      if group_name.nil?
+      if group_name.nil? || group_name.empty?
         get_ipam_subnet_by_cidr(cidr)
       else
         group = get_ipam_group(group_name)

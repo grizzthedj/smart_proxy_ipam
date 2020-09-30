@@ -1,6 +1,9 @@
+require 'resolv'
+
 # Module containing validation methods for use by all External IPAM provider implementations
 module Proxy::Ipam::IpamValidator
   include ::Proxy::Validations
+  include Proxy::Ipam::IpamHelper
 
   def validate_required_params!(required_params, params)
     err = []
@@ -13,9 +16,9 @@ module Proxy::Ipam::IpamValidator
   end
 
   def validate_ip!(ip)
-    IPAddr.new(ip).to_s
-  rescue IPAddr::InvalidAddressError => e
-    raise Proxy::Validations::Error, e.to_s
+    good_ip = ip =~ Regexp.union([Resolv::IPv4::Regex, Resolv::IPv6::Regex])
+    raise Proxy::Validations::Error, errors[:bad_ip] if good_ip.nil?
+    ip
   end
 
   def validate_cidr!(address, prefix)
@@ -36,8 +39,9 @@ module Proxy::Ipam::IpamValidator
   end
 
   def validate_mac!(mac)
+    raise Proxy::Validations::Error.new, errors[:mac] if mac.nil? || mac.empty?
     unless mac.match(/^([0-9a-fA-F]{2}[:]){5}[0-9a-fA-F]{2}$/i)
-      raise Proxy::Validations::Error.new, 'Mac address is not valid'
+      raise Proxy::Validations::Error.new, errors[:bad_mac]
     end
     mac
   end

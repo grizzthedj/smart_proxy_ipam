@@ -46,8 +46,8 @@ module Proxy::Ipam
       begin
         validate_required_params!([:address, :prefix, :mac], params)
 
-        mac = get_request_mac(params)
-        cidr = get_request_cidr(params)
+        mac = validate_mac!(params[:mac])
+        cidr = validate_cidr!(params[:address], params[:prefix])
         group_name = get_request_group(params)
 
         next_ip = provider.get_next_ip(mac, cidr, group_name)
@@ -94,10 +94,10 @@ module Proxy::Ipam
       begin
         validate_required_params!([:address, :prefix], params)
 
-        cidr = get_request_cidr(params)
+        cidr = validate_cidr!(params[:address], params[:prefix])
         group_name = get_request_group(params)
-
         subnet = provider.get_ipam_subnet(cidr, group_name)
+
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
         subnet.to_json
       rescue Proxy::Validations::Error => e
@@ -184,8 +184,8 @@ module Proxy::Ipam
         validate_required_params!([:group], params)
 
         group_name = get_request_group(params)
-
         group = provider.get_ipam_group(group_name)
+
         halt 404, { error: errors[:no_group] }.to_json if group.nil?
         group.to_json
       rescue Proxy::Validations::Error => e
@@ -271,8 +271,8 @@ module Proxy::Ipam
       begin
         validate_required_params!([:address, :prefix, :ip], params)
 
-        ip = get_request_ip(params)
-        cidr = get_request_cidr(params)
+        ip = validate_ip!(params[:ip])
+        cidr = validate_cidr!(params[:address], params[:prefix])
         group_name = get_request_group(params)
         subnet = provider.get_ipam_subnet(cidr, group_name)
 
@@ -316,8 +316,8 @@ module Proxy::Ipam
       begin
         validate_required_params!([:address, :ip, :prefix], params)
 
-        ip = get_request_ip(params)
-        cidr = get_request_cidr(params)
+        ip = validate_ip!(params[:ip])
+        cidr = validate_cidr!(params[:address], params[:prefix])
         group_name = get_request_group(params)
         subnet = provider.get_ipam_subnet(cidr, group_name)
 
@@ -364,9 +364,9 @@ module Proxy::Ipam
       begin
         validate_required_params!([:address, :ip, :prefix], params)
 
-        ip = get_request_ip(params)
-        cidr = get_request_cidr(params)
-        group_name = URI.escape(params[:group]) if params[:group]
+        ip = validate_ip!(params[:ip])
+        cidr = validate_cidr!(params[:address], params[:prefix])
+        group_name = get_request_group(params)
         subnet = provider.get_ipam_subnet(cidr, group_name)
 
         halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?

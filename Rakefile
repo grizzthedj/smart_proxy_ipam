@@ -70,7 +70,7 @@ module Proxy::#{provider_name.capitalize}
     end
 
     def get_ipam_groups
-      # Should return nil if no groups found, otherwise an array of group hashes with {:id, :name, :description}
+      # Should return [] if no groups found, otherwise an array of group hashes with {:id, :name, :description}
     end
 
     def get_ipam_subnets(group_name)
@@ -90,9 +90,12 @@ module Proxy::#{provider_name.capitalize}
     end
 
     def get_next_ip(mac, cidr, group_name)
-      # Should get next available ip from External IPAM, and return call to cache_next_ip
-      # which handles the ip caching
-      # cache_next_ip(@ip_cache, ip, mac, cidr, subnet_id, group_name)
+      # Should get next available ip from External IPAM, and should call cache_next_ip
+      # to handles the ip caching. Next IP should be returned in the "data" key of a hash
+
+      # ip = @api_resource.get("/provider/path/to/next_ip")
+      # next_ip = cache_next_ip(@ip_cache, ip, mac, cidr, subnet_id, group_name)
+      # { data: next_ip }
     end
 
     def groups_supported?

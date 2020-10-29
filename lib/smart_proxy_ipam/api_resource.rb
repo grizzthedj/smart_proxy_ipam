@@ -21,20 +21,17 @@ module Proxy::Ipam
       request = Net::HTTP::Get.new(uri)
       request[@auth_header] = @token
       request['Accept'] = 'application/json'
-      request['Content-Type'] = 'application/json'
 
       Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') do |http|
         http.request(request)
       end
     end
 
-    def delete(path, body = nil)
+    def delete(path)
       uri = URI(@api_base + path)
-      uri.query = URI.encode_www_form(body) if body
       request = Net::HTTP::Delete.new(uri)
       request[@auth_header] = @token
       request['Accept'] = 'application/json'
-      request['Content-Type'] = 'application/json'
 
       Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') do |http|
         http.request(request)

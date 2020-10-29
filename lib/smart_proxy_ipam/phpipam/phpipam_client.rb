@@ -41,7 +41,7 @@ module Proxy::Phpipam
       subnet_id = nil
 
       subnets.each do |subnet|
-        subnet_cidr = subnet[:subnet] + '/' + subnet[:mask]
+        subnet_cidr = "#{subnet[:subnet]}/#{subnet[:mask]}"
         subnet_id = subnet[:id] if subnet_cidr == cidr
       end
 
@@ -78,7 +78,7 @@ module Proxy::Phpipam
       return nil if group_name.nil?
       group = @api_resource.get("sections/#{group_name}/")
       json_body = JSON.parse(group.body)
-      raise errors[:no_group] if json_body['data'].nil?
+      raise ERRORS[:no_group] if json_body['data'].nil?
 
       data = {
         id: json_body['data']['id'],
@@ -92,7 +92,7 @@ module Proxy::Phpipam
     def get_ipam_groups
       groups = @api_resource.get('sections/')
       json_body = JSON.parse(groups.body)
-      return nil if json_body['data'].nil?
+      return [] if json_body['data'].nil?
 
       data = []
       json_body['data'].each do |group|
@@ -108,7 +108,7 @@ module Proxy::Phpipam
 
     def get_ipam_subnets(group_name)
       group = get_ipam_group(group_name)
-      raise errors[:no_group] if group.nil?
+      raise ERRORS[:no_group] if group.nil?
       subnets = @api_resource.get("sections/#{group[:id]}/subnets/")
       json_body = JSON.parse(subnets.body)
       return nil if json_body['data'].nil?
@@ -149,12 +149,13 @@ module Proxy::Phpipam
 
     def get_next_ip(mac, cidr, group_name)
       subnet = get_ipam_subnet(cidr, group_name)
-      raise errors[:no_subnet] if subnet.nil?
+      raise ERRORS[:no_subnet] if subnet.nil?
       response = @api_resource.get("subnets/#{subnet[:id]}/first_free/")
       json_body = JSON.parse(response.body)
       return { error: json_body['message'] } if json_body['message']
       ip = json_body['data']
-      cache_next_ip(@ip_cache, ip, mac, cidr, subnet[:id], group_name)
+      next_ip = cache_next_ip(@ip_cache, ip, mac, cidr, subnet[:id], group_name)
+      { data: next_ip }
     end
 
     def groups_supported?
@@ -168,7 +169,7 @@ module Proxy::Phpipam
     private
 
     def authenticate
-      auth_uri = URI(@api_base + '/user/')
+      auth_uri = URI("#{@api_base}/user/")
       request = Net::HTTP::Post.new(auth_uri)
       request.basic_auth @conf[:user], @conf[:password]
 

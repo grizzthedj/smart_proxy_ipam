@@ -16,13 +16,12 @@ module Proxy::Netbox
     include Proxy::Ipam::IpamHelper
     include Proxy::Ipam::IpamValidator
 
-    @ip_cache = nil
-
     def initialize(conf)
       @api_base = "#{conf[:url]}/api/"
       @token = conf[:token]
       @api_resource = Proxy::Ipam::ApiResource.new(api_base: @api_base, token: "Token #{@token}")
-      @ip_cache = Proxy::Ipam::IpCache.new(provider: 'netbox')
+      @ip_cache = Proxy::Ipam::IpCache.instance
+      @ip_cache.set_provider('netbox')
     end
 
     def get_ipam_subnet(cidr, group_name = nil)
@@ -173,8 +172,8 @@ module Proxy::Netbox
       json_body = JSON.parse(response.body)
       return nil if json_body.empty?
       ip = json_body[0]['address'].split('/').first
-      cache_next_ip(@ip_cache, ip, mac, cidr, subnet[:id], group_name)
-      { data: ip }
+      next_ip = cache_next_ip(@ip_cache, ip, mac, cidr, subnet[:id], group_name)
+      { data: next_ip }
     end
 
     def groups_supported?

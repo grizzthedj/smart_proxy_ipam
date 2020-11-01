@@ -13,7 +13,7 @@ class IpCacheTest < ::Test::Unit::TestCase
   end
 
   def setup
-    @ip_cache = Proxy::Ipam::IpCache.new(provider: 'test')
+    @ip_cache = Proxy::Ipam::IpCache.instance
     @ip = '172.100.10.1'
     @mac = '00:0a:95:9d:68:10'
     @cidr = '172.100.10.0/29'

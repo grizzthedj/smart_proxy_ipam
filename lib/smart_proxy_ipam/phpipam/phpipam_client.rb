@@ -16,14 +16,13 @@ module Proxy::Phpipam
     include Proxy::Ipam::IpamHelper
     include Proxy::Ipam::IpamValidator
 
-    @ip_cache = nil
-
     def initialize(conf)
       @conf = conf
       @api_base = "#{@conf[:url]}/api/#{@conf[:user]}/"
       @token = authenticate
       @api_resource = Proxy::Ipam::ApiResource.new(api_base: @api_base, token: @token, auth_header: 'Token')
-      @ip_cache = Proxy::Ipam::IpCache.new(provider: 'phpipam')
+      @ip_cache = Proxy::Ipam::IpCache.instance
+      @ip_cache.set_provider('phpipam')
     end
 
     def get_ipam_subnet(cidr, group_name = nil)

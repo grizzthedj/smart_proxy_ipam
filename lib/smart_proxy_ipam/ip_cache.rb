@@ -4,38 +4,45 @@ require 'monitor'
 require 'concurrent'
 require 'time'
 require 'smart_proxy_ipam/ipam_helper'
+require 'singleton'
 
 module Proxy::Ipam
   # Class for managing temp in-memory cache to prevent same IP's being suggested in race conditions
   class IpCache
+    include Singleton
     include Proxy::Log
     include Proxy::Ipam::IpamHelper
 
     DEFAULT_CLEANUP_INTERVAL = 60
-    @@ip_cache = nil
-    @@timer_task = nil
 
-    def initialize(params = {})
-      @@m = Monitor.new
-      @provider = params[:provider].to_s
-      init_cache if @@ip_cache.nil?
-      start_cleanup_task if @@timer_task.nil?
+    def initialize
+      @m = Monitor.new
+      init_cache
+      start_cleanup_task
+    end
+
+    def set_provider(provider)
+      @provider = provider
+    end
+
+    def get_provider
+      @provider
     end
 
     def set_group(group, value)
-      @@ip_cache[group.to_sym] = value
+      @ip_cache[group.to_sym] = value
     end
 
     def get_group(group)
-      @@ip_cache[group.to_sym]
+      @ip_cache[group.to_sym]
     end
 
     def get_cidr(group, cidr)
-      @@ip_cache[group.to_sym][cidr.to_sym]
+      @ip_cache[group.to_sym][cidr.to_sym]
     end
 
     def get_ip(group_name, cidr, mac)
-      @@ip_cache[group_name.to_sym][cidr.to_sym][mac.to_sym][:ip]
+      @ip_cache[group_name.to_sym][cidr.to_sym][mac.to_sym][:ip]
     end
 
     def get_cleanup_interval
@@ -43,27 +50,27 @@ module Proxy::Ipam
     end
 
     def ip_exists(ip, cidr, group_name)
-      cidr_key = @@ip_cache[group_name.to_sym][cidr.to_sym]&.to_s
+      cidr_key = @ip_cache[group_name.to_sym][cidr.to_sym]&.to_s
       cidr_key.include?(ip.to_s)
     end
 
     def add(ip, mac, cidr, group_name)
-      logger.debug("Adding IP '#{ip}' to cache for subnet '#{cidr}' in group '#{group_name}' for provider #{@provider}")
-      @@m.synchronize do
+      logger.debug("Adding IP '#{ip}' to cache for subnet '#{cidr}' in group '#{group_name}' for IPAM provider #{@provider.to_s}")
+      @m.synchronize do
         mac_addr = mac.nil? || mac.empty? ? SecureRandom.uuid : mac
-        group_hash = @@ip_cache[group_name.to_sym]
+        group_hash = @ip_cache[group_name.to_sym]
 
         group_hash.each do |key, values|
           if values.keys.include? mac_addr.to_sym
-            @@ip_cache[group_name.to_sym][key].delete(mac_addr.to_sym)
+            @ip_cache[group_name.to_sym][key].delete(mac_addr.to_sym)
           end
-          @@ip_cache[group_name.to_sym].delete(key) if @@ip_cache[group_name.to_sym][key].nil? || @@ip_cache[group_name.to_sym][key].empty?
+          @ip_cache[group_name.to_sym].delete(key) if @ip_cache[group_name.to_sym][key].nil? || @ip_cache[group_name.to_sym][key].empty?
         end
 
         if group_hash.key?(cidr.to_sym)
-          @@ip_cache[group_name.to_sym][cidr.to_sym][mac_addr.to_sym] = {ip: ip.to_s, timestamp: Time.now.to_s}
+          @ip_cache[group_name.to_sym][cidr.to_sym][mac_addr.to_sym] = {ip: ip.to_s, timestamp: Time.now.to_s}
         else
-          @@ip_cache = @@ip_cache.merge({group_name.to_sym => {cidr.to_sym => {mac_addr.to_sym => {ip: ip.to_s, timestamp: Time.now.to_s}}}})
+          @ip_cache = @ip_cache.merge({group_name.to_sym => {cidr.to_sym => {mac_addr.to_sym => {ip: ip.to_s, timestamp: Time.now.to_s}}}})
         end
       end
     end
@@ -71,12 +78,12 @@ module Proxy::Ipam
     private
 
     def start_cleanup_task
-      logger.info("Starting ip cache maintenance for provider #{@provider}, used by /next_ip.")
-      @@timer_task = Concurrent::TimerTask.new(execution_interval: DEFAULT_CLEANUP_INTERVAL) { init_cache }
-      @@timer_task.execute
+      logger.info("Starting ip cache maintenance for IPAM provider #{@provider.to_s}, used by /next_ip.")
+      @timer_task = Concurrent::TimerTask.new(execution_interval: DEFAULT_CLEANUP_INTERVAL) { init_cache }
+      @timer_task.execute
     end
 
-    # @@ip_cache structure
+    # @ip_cache structure
     #
     # Groups of subnets are cached under the External IPAM Group name. For example,
     # "IPAM Group Name" would be the section name in phpIPAM. All IP's cached for subnets
@@ -107,22 +114,22 @@ module Proxy::Ipam
     #   }
     # }
     def init_cache
-      @@m.synchronize do
-        if @@ip_cache && !@@ip_cache.empty?
-          logger.debug("Processing ip cache for provider #{@provider}")
-          @@ip_cache.each do |group, subnets|
+      @m.synchronize do
+        if @ip_cache && !@ip_cache.empty?
+          logger.debug("Processing ip cache for IPAM provider #{@provider.to_s}")
+          @ip_cache.each do |group, subnets|
             subnets.each do |cidr, macs|
               macs.each do |mac, ip|
                 if Time.now - Time.parse(ip[:timestamp]) > DEFAULT_CLEANUP_INTERVAL
-                  @@ip_cache[group][cidr].delete(mac)
+                  @ip_cache[group][cidr].delete(mac)
                 end
               end
-              @@ip_cache[group].delete(cidr) if @@ip_cache[group][cidr].nil? || @@ip_cache[group][cidr].empty?
+              @ip_cache[group].delete(cidr) if @ip_cache[group][cidr].nil? || @ip_cache[group][cidr].empty?
             end
           end
         else
-          logger.debug("Clearing ip cache for provider #{@provider}")
-          @@ip_cache = {'': {}}
+          logger.debug("Clearing ip cache for IPAM provider #{@provider.to_s}")
+          @ip_cache = {'': {}}
         end
       end
     end

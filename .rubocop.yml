@@ -37,6 +37,9 @@ Style/RedundantRegexpCharacterClass:
 Lint/UriEscapeUnescape:
   Enabled: false
 
+Lint/RedundantStringCoercion:
+  Enabled: false
+
 # === Metrics rules ===========
 Metrics:
   Enabled: false

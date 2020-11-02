@@ -278,7 +278,7 @@ module Proxy::Ipam
         halt 404, { error: ERRORS[:no_subnet] }.to_json if subnet.nil?
         validate_ip_in_cidr!(ip, cidr)
         ip_exists = provider.ip_exists?(ip, subnet[:id], group_name)
-        halt 200, ip_exists.to_json
+        status 200, ip_exists.to_json
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)
         halt 400, { error: e.to_s }.to_json

@@ -27,7 +27,7 @@ module Proxy::Ipam
     #   ======================
     #     Http Code:     200
     #     JSON Response:
-    #       "100.55.55.3"
+    #       {"data": "100.55.55.3"}
     #
     #   Response if missing parameter(e.g. 'mac')
     #   ======================
@@ -374,7 +374,7 @@ module Proxy::Ipam
 
         ip_deleted = provider.delete_ip_from_subnet(ip, del_ip_params) # Returns nil on success
         halt 500, ip_deleted.to_json unless ip_deleted.nil?
-        halt 204
+        status 204
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)
         halt 400, { error: e.to_s }.to_json

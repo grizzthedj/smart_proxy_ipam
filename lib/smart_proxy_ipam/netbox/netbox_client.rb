@@ -21,7 +21,7 @@ module Proxy::Netbox
       @token = conf[:token]
       @api_resource = Proxy::Ipam::ApiResource.new(api_base: @api_base, token: "Token #{@token}")
       @ip_cache = Proxy::Ipam::IpCache.instance
-      @ip_cache.set_provider('netbox')
+      @ip_cache.set_provider_name('netbox')
     end
 
     def get_ipam_subnet(cidr, group_name = nil)
@@ -70,7 +70,8 @@ module Proxy::Netbox
 
     def get_ipam_group(group_name)
       raise ERRORS[:groups_not_supported] unless groups_supported?
-      params = URI.encode_www_form({ name: group_name })
+      # TODO: Fix encoding of params in a common way for all providers
+      params = URI.encode_www_form({ name: URI.decode(group_name) })
       response = @api_resource.get("ipam/vrfs/?#{params}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?

@@ -22,7 +22,7 @@ module Proxy::Phpipam
       @token = authenticate
       @api_resource = Proxy::Ipam::ApiResource.new(api_base: @api_base, token: @token, auth_header: 'Token')
       @ip_cache = Proxy::Ipam::IpCache.instance
-      @ip_cache.set_provider('phpipam')
+      @ip_cache.set_provider_name('phpipam')
     end
 
     def get_ipam_subnet(cidr, group_name = nil)

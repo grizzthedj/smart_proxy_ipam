@@ -90,7 +90,7 @@ module Proxy::Ipam::IpamHelper
       end
     end
 
-    next_ip
+    {data: next_ip}
   end
 
   def increment_ip(ip)
@@ -107,26 +107,4 @@ module Proxy::Ipam::IpamHelper
     halt 500, { error: errors[:groups_not_supported] }.to_json if group && !provider.groups_supported?
     group
   end
-
-  # def errors
-  #   {
-  #     cidr: "A 'cidr' parameter for the subnet must be provided(e.g. IPv4: 100.10.10.0/24, IPv6: 2001:db8:abcd:12::/124)",
-  #     mac: "A 'mac' address must be provided(e.g. 00:0a:95:9d:68:10)",
-  #     ip: "Missing 'ip' parameter. An IPv4 or IPv6 address must be provided(e.g. IPv4: 100.10.10.22, IPv6: 2001:db8:abcd:12::3)",
-  #     group_name: "A 'group_name' must be provided",
-  #     no_ip: 'IP address not found',
-  #     no_free_ips: 'No free addresses found',
-  #     no_connection: 'Unable to connect to External IPAM server',
-  #     no_group: 'Group not found in External IPAM',
-  #     no_groups: 'No groups found in External IPAM',
-  #     no_subnet: 'Subnet not found in External IPAM',
-  #     no_subnets_in_group: 'No subnets found in External IPAM group',
-  #     provider: "The IPAM provider must be specified(e.g. 'phpipam' or 'netbox')",
-  #     groups_not_supported: 'Groups are not supported',
-  #     add_ip: 'Error adding IP to External IPAM',
-  #     bad_mac: 'Mac address is invalid',
-  #     bad_ip: 'IP address is invalid',
-  #     bad_cidr: 'The network cidr is invalid'
-  #   }
-  # end
 end

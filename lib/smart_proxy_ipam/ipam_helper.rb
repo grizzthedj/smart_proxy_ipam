@@ -90,7 +90,7 @@ module Proxy::Ipam::IpamHelper
       end
     end
 
-    {data: next_ip}
+    next_ip
   end
 
   def increment_ip(ip)

@@ -21,7 +21,7 @@ module Proxy::Ipam
       start_cleanup_task
     end
 
-    def set_provider(provider)
+    def set_provider_name(provider)
       @provider = provider
     end
 

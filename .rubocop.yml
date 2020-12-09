@@ -30,8 +30,14 @@ Style/GuardClause:
 Style/PercentLiteralDelimiters:
   Enabled: false
 
+Style/RedundantRegexpCharacterClass:
+  Enabled: false
+
 # === Lint rules
 Lint/UriEscapeUnescape:
+  Enabled: false
+
+Lint/RedundantStringCoercion:
   Enabled: false
 
 # === Metrics rules ===========

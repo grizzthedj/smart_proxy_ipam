@@ -16,13 +16,12 @@ module Proxy::Netbox
     include Proxy::Ipam::IpamHelper
     include Proxy::Ipam::IpamValidator
 
-    @ip_cache = nil
-
     def initialize(conf)
       @api_base = "#{conf[:url]}/api/"
       @token = conf[:token]
-      @api_resource = Proxy::Ipam::ApiResource.new(api_base: @api_base, token: 'Token ' + @token)
-      @ip_cache = Proxy::Ipam::IpCache.new(provider: 'netbox')
+      @api_resource = Proxy::Ipam::ApiResource.new(api_base: @api_base, token: "Token #{@token}")
+      @ip_cache = Proxy::Ipam::IpCache.instance
+      @ip_cache.set_provider('netbox')
     end
 
     def get_ipam_subnet(cidr, group_name = nil)
@@ -35,7 +34,8 @@ module Proxy::Netbox
     end
 
     def get_ipam_subnet_by_group(cidr, group_id)
-      response = @api_resource.get("ipam/prefixes/?status=active&prefix=#{cidr}&vrf_id=#{group_id}")
+      params = URI.encode_www_form({ status: 'active', prefix: cidr, vrf_id: group_id })
+      response = @api_resource.get("ipam/prefixes/?#{params}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?
       subnet = subnet_from_result(json_body['results'][0])
@@ -43,7 +43,8 @@ module Proxy::Netbox
     end
 
     def get_ipam_subnet_by_cidr(cidr)
-      response = @api_resource.get("ipam/prefixes/?status=active&prefix=#{cidr}")
+      params = URI.encode_www_form({ status: 'active', prefix: cidr })
+      response = @api_resource.get("ipam/prefixes/?#{params}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?
       subnet = subnet_from_result(json_body['results'][0])
@@ -55,7 +56,7 @@ module Proxy::Netbox
       json_body = JSON.parse(response.body)
       groups = []
 
-      return nil if json_body['count'].zero?
+      return groups if json_body['count'].zero?
 
       json_body['results'].each do |group|
         groups.push({
@@ -68,8 +69,9 @@ module Proxy::Netbox
     end
 
     def get_ipam_group(group_name)
-      raise errors[:groups_not_supported] unless groups_supported?
-      response = @api_resource.get("ipam/vrfs/?name=#{group_name}")
+      raise ERRORS[:groups_not_supported] unless groups_supported?
+      params = URI.encode_www_form({ name: group_name })
+      response = @api_resource.get("ipam/vrfs/?#{params}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?
 
@@ -85,18 +87,19 @@ module Proxy::Netbox
     def get_group_id(group_name)
       return nil if group_name.nil? || group_name.empty?
       group = get_ipam_group(group_name)
-      raise errors[:no_group] if group.nil?
+      raise ERRORS[:no_group] if group.nil?
       group[:id]
     end
 
     def get_ipam_subnets(group_name)
       if group_name.nil?
-        response = @api_resource.get('ipam/prefixes/?status=active')
+        params = URI.encode_www_form({ status: 'active' })
       else
         group_id = get_group_id(group_name)
-        response = @api_resource.get("ipam/prefixes/?status=active&vrf_id=#{group_id}")
+        params = URI.encode_www_form({ status: 'active', vrf_id: group_id })
       end
 
+      response = @api_resource.get("ipam/prefixes/?#{params}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?
       subnets = []
@@ -115,9 +118,9 @@ module Proxy::Netbox
 
     def ip_exists?(ip, subnet_id, group_name)
       group_id = get_group_id(group_name)
-      url = "ipam/ip-addresses/?address=#{ip}"
-      url += "&prefix_id=#{subnet_id}" unless subnet_id.nil?
-      url += "&vrf_id=#{group_id}" unless group_id.nil?
+      url = "ipam/ip-addresses/?#{URI.encode_www_form({ address: ip })}"
+      url += "&#{URI.encode_www_form({ prefix_id: subnet_id })}" unless subnet_id.nil?
+      url += "&#{URI.encode_www_form({ vrf_id: group_id })}" unless group_id.nil?
       response = @api_resource.get(url)
       json_body = JSON.parse(response.body)
       return false if json_body['count'].zero?
@@ -145,15 +148,16 @@ module Proxy::Netbox
       group_name = params[:group_name]
 
       if group_name.nil? || group_name.empty?
-        response = @api_resource.get("ipam/ip-addresses/?address=#{ip}")
+        params = URI.encode_www_form({ address: ip })
       else
         group_id = get_group_id(group_name)
-        response = @api_resource.get("ipam/ip-addresses/?address=#{ip}&vrf_id=#{group_id}")
+        params = URI.encode_www_form({ address: ip, vrf_id: group_id })
       end
 
+      response = @api_resource.get("ipam/ip-addresses/?#{params}")
       json_body = JSON.parse(response.body)
 
-      return { error: errors[:no_ip] } if json_body['count'].zero?
+      return { error: ERRORS[:no_ip] } if json_body['count'].zero?
 
       address_id = json_body['results'][0]['id']
       response = @api_resource.delete("ipam/ip-addresses/#{address_id}/")
@@ -163,12 +167,13 @@ module Proxy::Netbox
 
     def get_next_ip(mac, cidr, group_name)
       subnet = get_ipam_subnet(cidr, group_name)
-      raise errors[:no_subnet] if subnet.nil?
+      raise ERRORS[:no_subnet] if subnet.nil?
       response = @api_resource.get("ipam/prefixes/#{subnet[:id]}/available-ips/?limit=1")
       json_body = JSON.parse(response.body)
       return nil if json_body.empty?
       ip = json_body[0]['address'].split('/').first
-      cache_next_ip(@ip_cache, ip, mac, cidr, subnet[:id], group_name)
+      next_ip = cache_next_ip(@ip_cache, ip, mac, cidr, subnet[:id], group_name)
+      { data: next_ip }
     end
 
     def groups_supported?

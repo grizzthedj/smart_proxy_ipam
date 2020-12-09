@@ -64,7 +64,7 @@ class IpamValidatorTest < ::Test::Unit::TestCase
     address = '172.10.40.0'
     prefix = '29'
     validated_cidr = validate_cidr!(address, prefix)
-    assert validated_cidr == address + '/' + prefix
+    assert validated_cidr == "#{address}/#{prefix}"
   end
 
   def test_validate_cidr_should_return_nil_for_invalid_cidr

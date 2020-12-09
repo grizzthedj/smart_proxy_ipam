@@ -30,4 +30,8 @@ class IpamHelperTest < ::Test::Unit::TestCase
     incremented_ip = increment_ip(ip)
     assert incremented_ip == '10.20.30.2'
   end
+
+  def test_errors_hash_is_frozen
+    assert ERRORS.frozen?
+  end
 end

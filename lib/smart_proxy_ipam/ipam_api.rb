@@ -51,7 +51,7 @@ module Proxy::Ipam
         group_name = get_request_group(params)
 
         next_ip = provider.get_next_ip(mac, cidr, group_name)
-        halt 404, { error: errors[:no_free_ips] }.to_json if next_ip.nil?
+        halt 404, { error: ERRORS[:no_free_ips] }.to_json if next_ip.nil?
         next_ip.to_json
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)
@@ -60,8 +60,8 @@ module Proxy::Ipam
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+        logger.warn(ERRORS[:no_connection])
+        halt 500, { error: ERRORS[:no_connection] }.to_json
       end
     end
 
@@ -98,7 +98,7 @@ module Proxy::Ipam
         group_name = get_request_group(params)
         subnet = provider.get_ipam_subnet(cidr, group_name)
 
-        halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
+        halt 404, { error: ERRORS[:no_subnet] }.to_json if subnet.nil?
         subnet.to_json
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)
@@ -107,8 +107,8 @@ module Proxy::Ipam
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+        logger.warn(ERRORS[:no_connection])
+        halt 500, { error: ERRORS[:no_connection] }.to_json
       end
     end
 
@@ -139,9 +139,8 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        halt 500, { error: errors[:groups_not_supported] }.to_json unless provider.groups_supported?
+        halt 500, { error: ERRORS[:groups_not_supported] }.to_json unless provider.groups_supported?
         groups = provider.get_ipam_groups
-        halt 404, { error: errors[:no_groups] }.to_json if groups.nil?
         groups.to_json
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)
@@ -150,8 +149,8 @@ module Proxy::Ipam
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+        logger.warn(ERRORS[:no_connection])
+        halt 500, { error: ERRORS[:no_connection] }.to_json
       end
     end
 
@@ -186,7 +185,7 @@ module Proxy::Ipam
         group_name = get_request_group(params)
         group = provider.get_ipam_group(group_name)
 
-        halt 404, { error: errors[:no_group] }.to_json if group.nil?
+        halt 404, { error: ERRORS[:no_group] }.to_json if group.nil?
         group.to_json
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)
@@ -195,8 +194,8 @@ module Proxy::Ipam
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+        logger.warn(ERRORS[:no_connection])
+        halt 500, { error: ERRORS[:no_connection] }.to_json
       end
     end
 
@@ -234,7 +233,7 @@ module Proxy::Ipam
         group_name = get_request_group(params)
         subnets = provider.get_ipam_subnets(group_name)
 
-        halt 404, { error: errors[:no_subnets_in_group] }.to_json if subnets.nil?
+        halt 404, { error: ERRORS[:no_subnets_in_group] }.to_json if subnets.nil?
         subnets.to_json
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)
@@ -243,8 +242,8 @@ module Proxy::Ipam
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+        logger.warn(ERRORS[:no_connection])
+        halt 500, { error: ERRORS[:no_connection] }.to_json
       end
     end
 
@@ -276,7 +275,7 @@ module Proxy::Ipam
         group_name = get_request_group(params)
         subnet = provider.get_ipam_subnet(cidr, group_name)
 
-        halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
+        halt 404, { error: ERRORS[:no_subnet] }.to_json if subnet.nil?
         validate_ip_in_cidr!(ip, cidr)
         ip_exists = provider.ip_exists?(ip, subnet[:id], group_name)
         halt 200, ip_exists.to_json
@@ -287,8 +286,8 @@ module Proxy::Ipam
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+        logger.warn(ERRORS[:no_connection])
+        halt 500, { error: ERRORS[:no_connection] }.to_json
       end
     end
 
@@ -321,13 +320,13 @@ module Proxy::Ipam
         group_name = get_request_group(params)
         subnet = provider.get_ipam_subnet(cidr, group_name)
 
-        halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
+        halt 404, { error: ERRORS[:no_subnet] }.to_json if subnet.nil?
         add_ip_params = { cidr: cidr, subnet_id: subnet[:id], group_name: group_name }
         validate_ip_in_cidr!(ip, cidr)
 
         ip_added = provider.add_ip_to_subnet(ip, add_ip_params) # Returns nil on success
         halt 500, ip_added.to_json unless ip_added.nil?
-        halt 201
+        status 201
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)
         halt 400, { error: e.to_s }.to_json
@@ -335,8 +334,8 @@ module Proxy::Ipam
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+        logger.warn(ERRORS[:no_connection])
+        halt 500, { error: ERRORS[:no_connection] }.to_json
       end
     end
 
@@ -369,13 +368,13 @@ module Proxy::Ipam
         group_name = get_request_group(params)
         subnet = provider.get_ipam_subnet(cidr, group_name)
 
-        halt 404, { error: errors[:no_subnet] }.to_json if subnet.nil?
+        halt 404, { error: ERRORS[:no_subnet] }.to_json if subnet.nil?
         del_ip_params = { cidr: cidr, subnet_id: subnet[:id], group_name: group_name }
         validate_ip_in_cidr!(ip, cidr)
 
         ip_deleted = provider.delete_ip_from_subnet(ip, del_ip_params) # Returns nil on success
         halt 500, ip_deleted.to_json unless ip_deleted.nil?
-        halt 200
+        halt 204
       rescue Proxy::Validations::Error => e
         logger.warn(e.message)
         halt 400, { error: e.to_s }.to_json
@@ -383,8 +382,8 @@ module Proxy::Ipam
         logger.warn(e.message)
         halt 500, { error: e.message }.to_json
       rescue Errno::ECONNREFUSED, Errno::ECONNRESET
-        logger.warn(errors[:no_connection])
-        halt 500, { error: errors[:no_connection] }.to_json
+        logger.warn(ERRORS[:no_connection])
+        halt 500, { error: ERRORS[:no_connection] }.to_json
       end
     end
   end

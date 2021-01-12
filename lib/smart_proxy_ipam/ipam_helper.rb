@@ -72,7 +72,7 @@ module Proxy::Ipam::IpamHelper
     subnet_hash = ip_cache.get_cidr(group, cidr)
     next_ip = nil
 
-    if subnet_hash&.key?(mac.to_sym)
+    if mac && subnet_hash&.key?(mac.to_sym)
       next_ip = ip_cache.get_ip(group, cidr, mac)
     else
       new_ip = ip

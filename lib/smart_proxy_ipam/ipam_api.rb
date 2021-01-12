@@ -44,9 +44,10 @@ module Proxy::Ipam
       content_type :json
 
       begin
-        validate_required_params!([:address, :prefix, :mac], params)
+        validate_required_params!([:address, :prefix], params)
 
-        mac = validate_mac!(params[:mac])
+        mac_param = params[:mac]
+        mac = validate_mac!(params[:mac]) unless mac_param.nil? || mac_param.empty?
         cidr = validate_cidr!(params[:address], params[:prefix])
         group_name = get_request_group(params)
 

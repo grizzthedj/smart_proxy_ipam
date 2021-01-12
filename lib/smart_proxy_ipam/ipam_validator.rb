@@ -39,7 +39,6 @@ module Proxy::Ipam::IpamValidator
   end
 
   def validate_mac!(mac)
-    raise Proxy::Validations::Error.new, ERRORS[:mac] if mac.nil? || mac.empty?
     unless mac.match(/^([0-9a-fA-F]{2}[:]){5}[0-9a-fA-F]{2}$/i)
       raise Proxy::Validations::Error.new, ERRORS[:bad_mac]
     end

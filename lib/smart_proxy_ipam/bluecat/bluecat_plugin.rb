@@ -1,13 +1,13 @@
-module Proxy::Netbox
+module Proxy::Bluecat
   class Plugin < ::Proxy::Provider
-    plugin :externalipam_netbox, Proxy::Ipam::VERSION
+    plugin :externalipam_bluecat, Proxy::Ipam::VERSION
 
     requires :externalipam, Proxy::Ipam::VERSION
     validate :url, url: true
     validate_presence :token
 
     load_classes(proc do
-      require 'smart_proxy_ipam/netbox/netbox_client'
+      require 'smart_proxy_ipam/bluecat/bluecat_client'
     end)
 
     load_dependency_injection_wirings(proc do |container_instance, settings|

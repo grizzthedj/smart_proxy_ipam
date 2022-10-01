@@ -10,7 +10,7 @@ require 'smart_proxy_ipam/api_resource'
 require 'smart_proxy_ipam/ip_cache'
 
 module Proxy::Bluecat
-  # Implementation class for External IPAM provider Netbox
+  # Implementation class for External IPAM provider Bluecat
   class BluecatClient
     include Proxy::Log
     include Proxy::Ipam::IpamHelper
@@ -43,8 +43,9 @@ module Proxy::Bluecat
     end
 
     def get_ipam_subnet_by_cidr(cidr)
-      params = URI.encode_www_form({ status: 'active', prefix: cidr })
-      response = @api_resource.get("ipam/prefixes/?#{params}")
+      network_addr = cidr.split('/')[0]
+      params = URI.encode_www_form({ type: 'IP4Network', address: network_addr, containerId: 5 })
+      response = @api_resource.get("getIPRangedByIP/?#{params}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?
       subnet = subnet_from_result(json_body['results'][0])
@@ -169,7 +170,8 @@ module Proxy::Bluecat
     def get_next_ip(mac, cidr, group_name)
       subnet = get_ipam_subnet(cidr, group_name)
       raise ERRORS[:no_subnet] if subnet.nil?
-      response = @api_resource.get("ipam/prefixes/#{subnet[:id]}/available-ips/?limit=1")
+      params = URI.encode_www_form(parentId: subnet['parentId'.to_sym])
+      response = @api_resource.get("getNextAvailableIP4Address/?#{params}")
       json_body = JSON.parse(response.body)
       return nil if json_body.empty?
       ip = json_body[0]['address'].split('/').first
@@ -178,7 +180,7 @@ module Proxy::Bluecat
     end
 
     def groups_supported?
-      true
+      false
     end
 
     def authenticated?
@@ -197,6 +199,15 @@ module Proxy::Bluecat
       if response.code == '200'
         token = response.body.split()[2] + " " + response.body.split()[3]
       end
+    end
+
+    def subnet_from_result(result)
+      {
+        id: result['id'],
+        subnet: result['properties'].split("CIDR=")[1].split("|")[0].split("/").first,
+        mask: result['properties'].split("CIDR=")[1].split("|")[0].split("/").last,
+        description: result['name']
+      }
     end
   end
 end

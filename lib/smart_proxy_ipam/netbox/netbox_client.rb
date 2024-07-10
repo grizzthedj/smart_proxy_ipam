@@ -71,7 +71,7 @@ module Proxy::Netbox
     def get_ipam_group(group_name)
       raise ERRORS[:groups_not_supported] unless groups_supported?
       # TODO: Fix encoding of params in a common way for all providers
-      params = URI.encode_www_form({ name: URI.decode(group_name) })
+      params = URI.encode_www_form({ name: URI.decode_www_form_component(group_name) })
       response = @api_resource.get("ipam/vrfs/?#{params}")
       json_body = JSON.parse(response.body)
       return nil if json_body['count'].zero?

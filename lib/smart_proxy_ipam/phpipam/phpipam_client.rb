@@ -140,9 +140,10 @@ module Proxy::Phpipam
     end
 
     def delete_ip_from_subnet(ip, params)
-      subnet = @api_resource.delete("addresses/#{ip}/#{params[:subnet_id]}/")
-      json_body = JSON.parse(subnet.body)
+      response = @api_resource.delete("addresses/#{ip}/#{params[:subnet_id]}/")
+      json_body = parse_json_body(response)
       return nil if json_body['success']
+      return { error: ERRORS[:no_ip] } if ip_not_found?(response, json_body)
       { error: 'Unable to delete IP from External IPAM' }
     end
 
@@ -166,6 +167,20 @@ module Proxy::Phpipam
     end
 
     private
+
+    def parse_json_body(response)
+      JSON.parse(response.body.to_s)
+    rescue JSON::ParserError
+      {}
+    end
+
+    # phpIPAM responds with a 404(either as http status, or in the response body) when
+    # the address to be deleted is not present in the subnet
+    def ip_not_found?(response, json_body)
+      return true if response.code == '404'
+      return true if json_body['code'].to_i == 404
+      !(json_body['message'].to_s =~ /does not exist|not found/i).nil?
+    end
 
     def authenticate
       auth_uri = URI("#{@api_base}/user/")

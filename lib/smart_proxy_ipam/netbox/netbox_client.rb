@@ -163,6 +163,8 @@ module Proxy::Netbox
       address_id = json_body['results'][0]['id']
       response = @api_resource.delete("ipam/ip-addresses/#{address_id}/")
       return nil if response.code == '204'
+      # The address was removed by someone else between the lookup and the delete
+      return { error: ERRORS[:no_ip] } if response.code == '404'
       { error: "Unable to delete #{ip} in External IPAM server" }
     end
 

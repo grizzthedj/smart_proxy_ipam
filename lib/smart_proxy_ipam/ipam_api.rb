@@ -353,7 +353,12 @@ module Proxy::Ipam
     #     Http Code:  200
     #     Response:   Empty
     #
-    #   Response if not added successfully:
+    #   Response if the ip does not exist in External IPAM:
+    #   ===========================
+    #     Http Code:  204
+    #     Response:   Empty
+    #
+    #   Response if not deleted successfully:
     #   ===========================
     #     Http Code:  500
     #     JSON Response:
@@ -374,6 +379,14 @@ module Proxy::Ipam
         validate_ip_in_cidr!(ip, cidr)
 
         ip_deleted = provider.delete_ip_from_subnet(ip, del_ip_params) # Returns nil on success
+
+        # Deleting an ip that is not present in External IPAM is not an error. The
+        # desired state(ip absent from the subnet) is already the case.
+        if ip_deleted && ip_deleted[:error] == ERRORS[:no_ip]
+          logger.info("IP #{ip} was not found in subnet #{cidr} in External IPAM, nothing to delete")
+          halt 204
+        end
+
         halt 500, ip_deleted.to_json unless ip_deleted.nil?
         halt 204
       rescue Proxy::Validations::Error => e
